@@ -1,0 +1,223 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AGENTS.md and session skills</title><style>
+    @font-face{font-family:Geist;src:url(from-hierarchy-to-intelligence/Geist-Variable.woff2);font-weight:100 900;font-display:swap}
+    :root{--background:#fff;--foreground:#0a0a0a;--card:#fff;--card-foreground:#0a0a0a;--primary:#171717;--primary-foreground:#fafafa;--muted:#f5f5f5;--muted-foreground:#737373;--border:#e5e5e5;--ring:#a1a1a1;--radius:0.625rem}
+    *{box-sizing:border-box}body{margin:0;background:var(--background);color:var(--foreground);font:14px/1.6 Geist,sans-serif;letter-spacing:.01em}
+    a{color:inherit;text-underline-offset:4px}button{font:inherit;cursor:pointer}button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--ring);outline-offset:4px}
+    header,main,footer{max-width:1280px;margin:auto;padding:32px}header{border-bottom:1px solid var(--border)}
+    .meta{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-foreground)}
+    h1{font-size:48px;line-height:1.05;font-weight:650;margin:16px 0}h2{font-size:24px;line-height:1.3;margin:0 0 16px}h3{font-size:18px;margin:0}p{margin:8px 0 16px}
+    .intro{max-width:760px;font-size:18px}.toolbar{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:24px}
+    .button{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:6px 16px;border:1px solid var(--border);border-radius:calc(var(--radius)*.8);background:var(--card);color:var(--card-foreground);text-decoration:none}
+    .button.primary{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary)}
+    main{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,1fr);gap:32px;align-items:start}
+    figure{margin:0}figure a{display:block}figure img{display:block;width:100%;height:auto;border:1px solid var(--border);border-radius:calc(var(--radius)*1.4)}figcaption{font-size:12px;color:var(--muted-foreground);margin-top:12px}
+    .panel{padding:24px;border:1px solid var(--border);border-radius:calc(var(--radius)*1.4);background:var(--card);color:var(--card-foreground);margin-bottom:24px}
+    .thesis{background:var(--primary);color:var(--primary-foreground)}.thesis p{font-size:20px;line-height:1.4;margin:0}
+    details{border-top:1px solid var(--border);padding:16px 0}details:last-child{padding-bottom:0}summary{cursor:pointer;font-weight:600;min-height:36px;align-content:center}details p{margin:12px 0 0}
+    .number{display:inline-block;width:24px;color:var(--muted-foreground);font-size:12px}.note{font-size:12px;color:var(--muted-foreground)}
+    .step{padding:16px;background:var(--muted);border-radius:var(--radius);margin:12px 0}.step p{margin-bottom:0}.roles{display:grid;gap:16px}.roles p{margin:0}
+    #example-text{min-height:110px}footer{border-top:1px solid var(--border);font-size:12px;color:var(--muted-foreground)}footer p{margin:0}
+    @media(max-width:800px){header,main,footer{padding:24px}h1{font-size:36px}main{grid-template-columns:1fr}.intro{font-size:16px}}
+    @media print{header,main,footer{padding:16px}.toolbar,.demo{display:none}main{display:block}aside{display:none}figure img{max-height:90vh;max-width:100%;width:auto;margin:auto}header h1{font-size:24px}header .intro{font-size:14px}}
+  main{display:block}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.6 var(--font-mono,monospace)}code,summary{overflow-wrap:anywhere}input{width:100%;font:inherit;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius);color:var(--foreground);background:var(--background)}li{padding:8px 0}</style></head><body><header><div class="meta">Current local files · session skill inventory</div><h1>Instructions &amp; skills.</h1><p class="intro">Two AGENTS.md files, reproduced completely. Four skills read/applied in this conversation; 106 skills listed in the available catalog.</p><p>No skill is a continuously running background process. Catalog descriptions are supplied in context; the complete SKILL.md files are read when relevant.</p></header><main><section class="panel"><details open><summary>/Users/xxuxinn/.codex/AGENTS.md</summary><p class="note">Directory: /Users/xxuxinn/.codex</p><pre>1. Think Before Working/Coding
+Don&#x27;t assume. Don&#x27;t hide confusion. Surface tradeoffs.
+
+Before implementing/working:
+
+State your assumptions explicitly. If uncertain, ask.
+If multiple interpretations exist, present them - don&#x27;t pick silently.
+If a simpler approach exists, say so. Push back when warranted.
+If something is unclear, stop. Name what&#x27;s confusing. Ask.
+
+2. Simplicity First
+Minimum code/script/steps/instructs that solves the problem. Nothing speculative.
+
+No features beyond what was asked.
+No abstractions for single-use code/script/step/instructs.
+No &quot;flexibility&quot; or &quot;configurability&quot; that wasn&#x27;t requested.
+No error handling for impossible scenarios.
+If you write 200 lines and it could be 50, rewrite it.
+Ask yourself: &quot;Would a senior engineer/professor say this is overcomplicated?&quot; If yes, simplify.
+
+3. Surgical Changes
+Touch only what you must. Clean up only your own mess.
+
+When editing existing code/script/lines-in-docs:
+
+Don&#x27;t &quot;improve&quot; adjacent code/script/lines-in-docs, comments, or formatting.
+Don&#x27;t refactor things that aren&#x27;t broken.
+Match existing style, even if you&#x27;d do it differently.
+If you notice unrelated dead code/script/lines-in-docs, mention it - don&#x27;t delete it.
+When your changes create orphans:
+
+Remove imports/variables/functions that YOUR changes made unused.
+Don&#x27;t remove pre-existing dead code/script/lines-in-docs unless asked.
+The test: Every changed line should trace directly to the user&#x27;s request.
+
+4. Goal-Driven Execution
+Define success criteria. Loop until verified.
+
+Transform tasks into verifiable goals:
+
+&quot;Add validation&quot; → &quot;Write tests for invalid inputs, then make them pass&quot;
+&quot;Fix the bug&quot; → &quot;Write a test that reproduces it, then make it pass&quot;
+&quot;Refactor X&quot; → &quot;Ensure tests pass before and after&quot;
+For multi-step tasks, state a brief plan:
+
+1) [Step] → verify: [check]
+2) [Step] → verify: [check]
+3) [Step] → verify: [check]
+Strong success criteria let you loop independently. Weak criteria (&quot;make it work&quot;) require constant clarification.
+
+5. In addition to the requested works, always generate an interactive, well design html to present the works.
+
+6. Social Identity: Xu Xin — Information Systems professor and Head of Department of Management &amp; Marketing at PolyU Hong Kong; co-author of the UTAUT2 paper (Venkatesh, Thong &amp; Xu 2012, MIS Quarterly); Director of the Faculty of Business Digital Transformation Centre.
+7. Identity (Self-conception): The above titles are context, not the center. He is a builder-thinker (&quot;I like to build and think&quot;) who directs AI rather than hand-codes, and who studies AI-driven organizational transformation by thinking about it and Trying it — he is both the researcher and the case.
+8. Decision doctrine (predictive, rough priority order):
+   8.1 Minimal first. &quot;Seems complex. Let&#x27;s do the minimal.&quot; He punishes speculative complexity and rewards designs that cut code. Counter-cycle: ambition builds empires in bursts, then a decisive demolition day removes what stopped earning its keep. He deletes without sentiment (&quot;Remove all the files … I do NOT need them anyway&quot;).
+   8.2 Diagnosis before fix. His signature correction is &quot;check, tell me why, and fix&quot; — a fix without the why is a miss.
+   8.3 Reversible = autonomous, irreversible = gated (adopted as doctrine 2026-07-19). He keeps approval authority (&quot;for my review&quot;, &quot;Discuss with me first, do NOT implement&quot;) yet resents exercising it on trivia — he once automated away his own &quot;ship it&quot; prompt.
+   8.4 Truth, tiered by stakes. 0% hallucination for scholarship and anything citable; ~10% error tolerable for low-stakes personal automation. Never fabricate a citation in his name.
+   8.5 Cost-consciousness as reflex. Token audits, subscription arbitrage, free-tier fallbacks, &quot;capped at 50% of usage limit&quot;. Predict the frugal option unless quality of a kept artifact is at stake — he pays for polish on things that persist (docs, HTML, visualizations).
+   8.6 Build over buy, reuse before build. Top-3 GitHub search first; adapt or port rather than depend when the dependency is heavy.
+
+9. Voice &amp; Tone
+Prof Xu&#x27;s Voice &amp; Tone follow the minimal style--always be concise and effective, key points in phrases preferred in comments, NOT complete sentences unless they are necessary. 
+10. Desktop GUI (computer use) — revised 2026-09-27
+   10.1 Codex&#x27;s own native computer-use plugin only. Orca computer use (`orca computer …`) is off — skill removed from `~/.agents/skills`; never use it, not even as fallback.
+   10.2 Browser work: native browser/chrome plugins, not this rule. Orca `orca-cli` + `orchestration` skills unaffected.
+</pre></details></section><section class="panel"><details open><summary>/Users/xxuxinn/orca/workspaces/OrcaRepo/Testing-Orca/AGENTS.md</summary><p class="note">Directory: /Users/xxuxinn/orca/workspaces/OrcaRepo/Testing-Orca</p><pre># Design System
+
+All UI work — layout, color, typography, spacing, component selection, UX behavior — must follow [`docs/STYLEGUIDE.md`](./docs/STYLEGUIDE.md). Most of it is linted: `pnpm run check:code-quality:changed` fails on new restyles of a `components/ui/` primitive, raw palette colors, and computed `className` strings; `pnpm lint` fails on any class Tailwind cannot generate. See the Enforcement section of the style guide before suppressing either. Use the tokens defined in `src/renderer/src/assets/main.css` (the canonical source) and the shadcn primitives in `src/renderer/src/components/ui/`. Don&#x27;t invent new color values, font sizes, or shadow tiers when a documented one already covers the role. When STYLEGUIDE.md is silent, follow the resolution order in its final section.
+
+## Electron UI Validation
+
+Always run tests and agent-launched apps in the background with `ORCA_BACKGROUND_LAUNCH=1`.
+Never steal monitor focus or reveal test windows: no `show()`, `showInactive()`, `bringToFront()`,
+`app.focus()`, or OS activation. Use CDP screenshots of hidden renderers. Keep native-focus and
+visible-window tests paused on the user&#x27;s desktop; run them on an isolated display or CI.
+Rebuild modified launch-policy code before running an app; stale build wrappers are not safe.
+
+Use the `$electron` skill and Playwright CDP for rendered Orca UI checks. Do not use computer-use for Orca UI validation.
+
+# Style
+
+## Reuse Before Reimplementing
+
+Before writing new logic at any scale — a function, component, IPC channel, state store, or whole subsystem/flow — check whether an existing implementation already does the job (or nearly does). Extend or generalize it instead of building a parallel version; only write from scratch when nothing fits. Keep the check proportionate: a quick search for trivial code, a real one before building anything substantial.
+
+## Concise/Brief Non-obvious Comments ONLY
+
+- DO NOT: be verbose, explain the obvious, walk through the code (&quot;WHY not HOW&quot;)
+- BE CONCISE. 1 LINE if possible
+
+## Lint Rules: Do Not Disable Max Lines
+
+NEVER add a `max-lines` disable (`eslint-disable max-lines`, `oxlint-disable max-lines`, or line-specific variants), and never add a per-file `max-lines` bump in `mobile/.oxlintrc.json`.
+
+## File and Module Naming
+
+Never use vague names like `helpers`, `utils`, `common`, `misc`, or `shared-stuff` for files, folders, or modules. They carry zero info and tend to become dumping grounds. Name files after what they _actually_ contain — prefer the concrete domain concept (e.g. `tab-group-state.ts`, `terminal-orphan-cleanup.ts`) over the generic role (`tabs-helpers.ts`, `terminal-utils.ts`). If you find yourself reaching for `helpers`, the file probably has more than one responsibility and should be split, or there&#x27;s a better name hiding in the code that describes what the functions operate on.
+
+## Type Declarations: Prefer `.ts` Over `.d.ts`
+
+## Type Assertions: Prefer Checked Types
+
+Avoid type assertions except `as const`. Unavoidable casts need a line-specific `SAFETY:` explanation:
+
+```ts
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Explain the verified invariant here.
+```
+
+# Verifying Changes
+
+- **Typecheck**: `pnpm tc` (or `tc:node` / `tc:cli` / `tc:web`)
+- **Test**: `pnpm test [path/to/file.test.ts]`
+- **Lint**: `oxlint`, or `pnpm run check:code-quality:changed` for changed files (full `pnpm lint` is slow); format with `pnpm format`
+- **Design system**: `pnpm run lint:design-system` for the full renderer report (not a gate); the changed-lines gate above is what CI enforces
+
+# Writing Pull Requests
+
+Fill in [`.github/pull_request_template.md`](./.github/pull_request_template.md), written for a reviewer who has never seen this code:
+
+- No jargon — plain language, no internal shorthand.
+- The before and after as the user experiences it.
+- The mechanism you changed, not just the symptom.
+- Why this approach over the alternatives you considered.
+
+Cover all four concisely. Don&#x27;t pad or walk the diff.
+
+# Considerations
+
+## Worktree Safety
+
+Always use the primary working directory (the worktree) for all file reads and edits. Never follow absolute paths from subagent results that point to the main repo.
+
+## Cross-Platform Support
+
+Orca targets macOS, Linux, and Windows. Keep all platform-dependent behavior behind runtime checks:
+
+- **Keyboard shortcuts**: Never hardcode `e.metaKey`. Use a platform check (`navigator.userAgent.includes(&#x27;Mac&#x27;)`) to pick `metaKey` on Mac and `ctrlKey` on Linux/Windows. Electron menu accelerators should use `CmdOrCtrl`.
+- **Shortcut labels in UI**: Display `⌘` / `⇧` on Mac and `Ctrl+` / `Shift+` on other platforms.
+- **File paths**: Use `path.join` or Electron/Node path utilities — never assume `/` or `\`.
+- **Windows terminal shells**: `--shell` picks the shell a terminal _is_; `--command` is typed into whatever shell the host spawned, so a shell choice routed through `command` silently becomes a child process. See [`docs/reference/windows-terminal-shell-selection.md`](./docs/reference/windows-terminal-shell-selection.md).
+- **Windows setup scripts**: the setup/issue-command runner is a `.cmd` batch file unless the script starts with a `#!` line — never derive that from the user&#x27;s terminal-shell preference, and never launch a `.cmd` runner with a bare `cmd.exe /c` from a Git Bash pane (MSYS rewrites the `/c`). See [`docs/reference/windows-setup-shell.md`](./docs/reference/windows-setup-shell.md).
+- **Windows child processes**: start them through `runProcess`/`spawnProcess` in `src/shared/child-process/` — never `child_process` directly. It pins `windowsHide`, refuses `shell: true`, and encodes `.cmd`/`.bat` arguments so neither `CommandLineToArgvW` nor `cmd.exe` mangles them. A ratchet test fails on any new direct import. Recognised npm/pnpm `.cmd` shims are resolved to their real target so the spawn skips `cmd.exe` entirely; see [`docs/reference/windows-cmd-shim-resolution.md`](./docs/reference/windows-cmd-shim-resolution.md) before adding a shim shape or debugging one.
+- **Ripgrep**: Orca bundles `rg` for every platform, WSL, and SSH remotes. Spawn it through `spawnBundledRipgrep` (main) or `resolveRelayRipgrepCommand` (relay), never a bare `&#x27;rg&#x27;` — Windows resolves a bare name in the spawn cwd before PATH. Don&#x27;t add git/readdir fallbacks locally; the relay&#x27;s chain exists only for hosts an upload never reached.
+- **Windows process enumeration**: read the table through `src/main/windows/windows-process-table.ts`, never by forking `powershell.exe`. See [`docs/reference/windows-process-enumeration.md`](./docs/reference/windows-process-enumeration.md).
+- **Windows MSYS/Git Bash panes**: their children break away from the per-PTY job unless it is created without `JOB_OBJECT_LIMIT_BREAKAWAY_OK`, and a `conpty.node` built before that fix passes every existing gate. Before changing the per-PTY job or debugging `windows-msys-job.win32.test.ts`, read [`docs/reference/windows-msys-job-breakaway.md`](./docs/reference/windows-msys-job-breakaway.md).
+- **Windows daemon-host relocation**: the terminal daemon runs from a copy of the app runtime under `%LOCALAPPDATA%`, which is what survives an auto-update. Before touching that copy, its exe name, or the NSIS uninstall macro, read [`docs/reference/windows-daemon-host-relocation.md`](./docs/reference/windows-daemon-host-relocation.md).
+- **Windows EDR signal**: don&#x27;t add `-ExecutionPolicy Bypass`, `-EncodedCommand`, `cmd.exe /c` with escaped free text, per-operation interpreter spawning, or runtime `Add-Type` compilation without reading [`docs/reference/windows-edr-posture.md`](./docs/reference/windows-edr-posture.md) first — behavioural EDR scores each of those, and being signed does not clear them.
+- **WSL commands**: build argv with `buildWslExecArgs` (always `--exec` — under `--`, `wsl.exe` expands `$name` in every argument and silently rewrites the script), and fence anything whose stdout you parse with `buildWslCapturedLoginShellCommand`, because the interactive login shell prints the distro banner to stdout. See [`docs/reference/wsl-command-execution.md`](./docs/reference/wsl-command-execution.md).
+- **Linux native modules**: keep the glibc floor at Ubuntu 20.04 / glibc 2.31. A module compiled from source on a newer runner can reference symbol versions absent on the floor and crash the app on startup. See [`docs/reference/linux-glibc-compatibility.md`](./docs/reference/linux-glibc-compatibility.md); packaging fails if a bundled native binary needs newer glibc.
+
+## Native Dependency Installs
+
+Ordinary `pnpm install` covers the host OS and CPU only. Before packaging for another architecture — including `pnpm build:mac`, which builds x64 and arm64 by default — run `pnpm install:release`. electron-builder only warns on a missing `extraResources` source, so the `beforePack` guard is what turns a thin install into a build failure instead of a silently broken artifact; see [`docs/reference/pnpm-install-policy.md`](./docs/reference/pnpm-install-policy.md).
+
+## SSH Use Case
+
+All changes must consider the SSH use case. Don&#x27;t assume local-only execution. Before changing anything that reports on, stops, or lists remote work, follow [`docs/reference/ssh-execution-boundary.md`](./docs/reference/ssh-execution-boundary.md): the execution host owns everything that touches execution, and loss of contact is never evidence of process death — the verdict vocabulary is `live` / `unverifiable` / `exited`, with no synonyms.
+
+## Folder Workspace Use Case
+
+All changes must consider folder workspaces as well as git worktrees. Don&#x27;t assume every workspace is a git worktree.
+
+## Agent Status
+
+The execution host owns agent status in one store, the hook server&#x27;s, and every reader (sidebar, `worktree ps`, mobile, dashboard) subscribes to it. Before adding a producer, a cache, or a reader-side precedence rule, read [`docs/reference/agent-status-store.md`](./docs/reference/agent-status-store.md): new producers write into that store, and readers keep only presentation policy.
+
+## Agent Terminal Screens
+
+A rule that reads what an agent CLI paints on a terminal — readiness, blocked prompts, idle — must be written against a captured transcript, not a remembered screen. Record one with [`docs/reference/agent-pty-transcript-capture.md`](./docs/reference/agent-pty-transcript-capture.md), which keeps escapes and wrapping intact and scrubs account identifiers before they reach git. Antigravity readiness has no transcript yet and five failed attempts without one; before touching it, read [`docs/reference/antigravity-readiness-evidence.md`](./docs/reference/antigravity-readiness-evidence.md).
+
+## Remote Wire Compatibility
+
+Clients and remote Orca servers update independently, so mixed versions are the normal state. Before changing anything a paired client and host exchange — RPC params, stream frames, or the content either side publishes over them — follow [`docs/reference/remote-wire-compatibility.md`](./docs/reference/remote-wire-compatibility.md). A new optional field is safe; a new stream opcode must be capability-negotiated because decoders drop unknown opcodes silently; and changing what the host publishes reaches old clients even with no wire change.
+
+## Git Binary Compatibility
+
+Orca runs the user&#x27;s Git binary on native, WSL, and SSH hosts, which may all have different versions. Treat Git 2.25 as the core-workflow baseline and follow [`docs/reference/git-compatibility.md`](./docs/reference/git-compatibility.md).
+
+When adding or changing a Git command:
+
+- Check when every subcommand and option was introduced. For newer behavior, keep a baseline-compatible fallback or degrade safely.
+- Use `GitCapabilityCache` with a narrow unsupported-error predicate so recurring operations do not retry a known-invalid command. Do not rely only on `git --version`; wrappers such as `simple-git` do not remove host-version differences.
+- Scope capability state to the host that executes Git: native, WSL distro, SSH provider, or relay connection. Cover the first fallback, later cached calls, concurrent probes, and relevant host isolation in tests.
+- Keep the real-binary compatibility contract in PR CI current. When adopting a newer Git feature, add its version boundary so the preferred command and fallback both run against representative Git releases.
+- Preserve commands that begin with global Git options such as `-c` before the subcommand, including auto-maintenance suppression used by worktree-create fetches.
+
+## Git Scan Safety
+
+- Never enumerate every ref and then run `git ls-tree -r` or `git show` once per ref. That ref × tree fan-out can retain gigabytes of output before a downstream `sort -u` or search can make progress.
+- Prefer `rg` over the checked-out files for source searches. For history or refs, use a named ref, an explicit namespace/path, `--max-count`, and a bounded output; do not use an unqualified `--all` scan as a first diagnostic.
+- Keep repository-wide commands targeted to the current repository and worktree. If an unbounded scan is genuinely required, measure the ref count first, explain the cost, and get confirmation before running it.
+
+## Git Provider Compatibility
+
+Source-control and review changes must consider GitLab and other supported git providers, not only GitHub. Keep provider-specific behavior behind explicit checks, and avoid GitHub-only naming for generic review concepts.
+
+## GitHub CLI Usage
+
+Be mindful of the user&#x27;s `gh` CLI API rate limit — batch requests where possible and avoid unnecessary calls. All code, commands, and scripts must be compatible with macOS, Linux, and Windows.
+</pre></details></section><section class="panel"><h2>Skills read/applied</h2><ul><li><strong>imagegen</strong><br><code>/Users/xxuxinn/.codex/skills/.system/imagegen/SKILL.md</code></li><li><strong>ego-browser</strong><br><code>/Users/xxuxinn/.agents/skills/ego-browser/SKILL.md</code></li><li><strong>orca-cli</strong><br><code>/Users/xxuxinn/.agents/skills/orca-cli/SKILL.md</code></li><li><strong>openai-docs</strong><br><code>/Users/xxuxinn/.codex/skills/.system/openai-docs/SKILL.md</code></li></ul></section><section class="panel"><details><summary>All 106 available skills</summary><label for="filter">Filter skills</label><input id="filter" type="search" placeholder="Skill name"><ul><li class="skill">imagegen · read/applied</li><li class="skill">openai-docs · read/applied</li><li class="skill">skill-creator · catalog only</li><li class="skill">skill-installer · catalog only</li><li class="skill">data-analytics:analyze-data-quality · catalog only</li><li class="skill">data-analytics:build-dashboard · catalog only</li><li class="skill">data-analytics:build-report · catalog only</li><li class="skill">data-analytics:create-data-context · catalog only</li><li class="skill">data-analytics:design-kpis · catalog only</li><li class="skill">data-analytics:gather-business-context · catalog only</li><li class="skill">data-analytics:index · catalog only</li><li class="skill">data-analytics:jupyter-notebooks · catalog only</li><li class="skill">data-analytics:kpi-reporting · catalog only</li><li class="skill">data-analytics:market-sizing · catalog only</li><li class="skill">data-analytics:metric-diagnostics · catalog only</li><li class="skill">data-analytics:product-business-analysis · catalog only</li><li class="skill">data-analytics:publish-artifact-to-sites · catalog only</li><li class="skill">data-analytics:validate-data · catalog only</li><li class="skill">data-analytics:visualize-data · catalog only</li><li class="skill">documents:documents · catalog only</li><li class="skill">ego-browser · read/applied</li><li class="skill">find-skills · catalog only</li><li class="skill">google-drive:google-docs · catalog only</li><li class="skill">google-drive:google-drive · catalog only</li><li class="skill">google-drive:google-drive-comments · catalog only</li><li class="skill">google-drive:google-sheets · catalog only</li><li class="skill">google-drive:google-slides · catalog only</li><li class="skill">grill-with-ui · catalog only</li><li class="skill">grilling · catalog only</li><li class="skill">inspection-wiki · catalog only</li><li class="skill">latex:latex-compile · catalog only</li><li class="skill">latex:latex-doctor · catalog only</li><li class="skill">latex:texlive-runtime-installer · catalog only</li><li class="skill">orca-cli · read/applied</li><li class="skill">orchestration · catalog only</li><li class="skill">pdf · catalog only</li><li class="skill">pdf:pdf · catalog only</li><li class="skill">playwright · catalog only</li><li class="skill">plugin-management:plugin-management · catalog only</li><li class="skill">presentations:Presentations · catalog only</li><li class="skill">record-and-replay:record-and-replay · catalog only</li><li class="skill">sites:sites-building · catalog only</li><li class="skill">sites:sites-hosting · catalog only</li><li class="skill">sites:sites-mcp · catalog only</li><li class="skill">sites:sites-preview-troubleshooting · catalog only</li><li class="skill">spreadsheets:Spreadsheets · catalog only</li><li class="skill">spreadsheets:excel-live-control · catalog only</li><li class="skill">template-creator:template-creator · catalog only</li><li class="skill">vercel:agent-browser · catalog only</li><li class="skill">vercel:agent-browser-verify · catalog only</li><li class="skill">vercel:ai-elements · catalog only</li><li class="skill">vercel:ai-gateway · catalog only</li><li class="skill">vercel:ai-generation-persistence · catalog only</li><li class="skill">vercel:ai-sdk · catalog only</li><li class="skill">vercel:auth · catalog only</li><li class="skill">vercel:bootstrap · catalog only</li><li class="skill">vercel:cdn-caching · catalog only</li><li class="skill">vercel:chat-sdk · catalog only</li><li class="skill">vercel:cms · catalog only</li><li class="skill">vercel:cron-jobs · catalog only</li><li class="skill">vercel:deployments-cicd · catalog only</li><li class="skill">vercel:email · catalog only</li><li class="skill">vercel:env-vars · catalog only</li><li class="skill">vercel:eve · catalog only</li><li class="skill">vercel:geist · catalog only</li><li class="skill">vercel:geistdocs · catalog only</li><li class="skill">vercel:investigation-mode · catalog only</li><li class="skill">vercel:json-render · catalog only</li><li class="skill">vercel:knowledge-update · catalog only</li><li class="skill">vercel:marketplace · catalog only</li><li class="skill">vercel:micro · catalog only</li><li class="skill">vercel:microfrontends · catalog only</li><li class="skill">vercel:ncc · catalog only</li><li class="skill">vercel:next-cache-components · catalog only</li><li class="skill">vercel:next-forge · catalog only</li><li class="skill">vercel:next-upgrade · catalog only</li><li class="skill">vercel:nextjs · catalog only</li><li class="skill">vercel:observability · catalog only</li><li class="skill">vercel:payments · catalog only</li><li class="skill">vercel:react-best-practices · catalog only</li><li class="skill">vercel:routing-middleware · catalog only</li><li class="skill">vercel:runtime-cache · catalog only</li><li class="skill">vercel:satori · catalog only</li><li class="skill">vercel:shadcn · catalog only</li><li class="skill">vercel:sign-in-with-vercel · catalog only</li><li class="skill">vercel:swr · catalog only</li><li class="skill">vercel:turbopack · catalog only</li><li class="skill">vercel:turborepo · catalog only</li><li class="skill">vercel:v0-dev · catalog only</li><li class="skill">vercel:vercel-agent · catalog only</li><li class="skill">vercel:vercel-api · catalog only</li><li class="skill">vercel:vercel-cli · catalog only</li><li class="skill">vercel:vercel-connect · catalog only</li><li class="skill">vercel:vercel-firewall · catalog only</li><li class="skill">vercel:vercel-flags · catalog only</li><li class="skill">vercel:vercel-functions · catalog only</li><li class="skill">vercel:vercel-queues · catalog only</li><li class="skill">vercel:vercel-sandbox · catalog only</li><li class="skill">vercel:vercel-services · catalog only</li><li class="skill">vercel:vercel-storage · catalog only</li><li class="skill">vercel:verification · catalog only</li><li class="skill">vercel:workflow · catalog only</li><li class="skill">visualize:visualize · catalog only</li><li class="skill">work-pets:create-pet · catalog only</li><li class="skill">work-pets:pets · catalog only</li><li class="skill">work-pets:update-pet · catalog only</li></ul><p id="count" class="note">106 skills shown</p></details></section></main><script>const filter=document.getElementById('filter');const rows=[...document.querySelectorAll('.skill')];filter.addEventListener('input',()=>{let count=0;for(const row of rows){row.hidden=!row.textContent.toLowerCase().includes(filter.value.toLowerCase());if(!row.hidden)count++;}document.getElementById('count').textContent=count+' skills shown';});</script></body></html>

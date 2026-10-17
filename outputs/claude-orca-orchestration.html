@@ -1,0 +1,1102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Inside Orca Orchestration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a sticky section rail on the left, one reading column, wide interactive figures that scroll inside their own frame. */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --sunk: #eaeef2;
+  --ink: #0f1419;
+  --muted: #586370;
+  --line: #d8dee5;
+  --accent: #0a78b4;
+  --accent-soft: #e1eff8;
+  --ok: #1d7f47;
+  --ok-soft: #e2f3e9;
+  --warn: #a2650c;
+  --warn-soft: #fbf0dc;
+  --bad: #b93a26;
+  --bad-soft: #fbe6e2;
+  --idle: #7b8794;
+  --idle-soft: #eceff2;
+  --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --radius: 10px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c1015; --surface: #141a21; --sunk: #1b232c; --ink: #e5ebf1; --muted: #93a0ae; --line: #27313c;
+    --accent: #52b4e8; --accent-soft: #12293a; --ok: #4fc387; --ok-soft: #12291d; --warn: #e3a94d; --warn-soft: #2d2412;
+    --bad: #f07a63; --bad-soft: #321a16; --idle: #8d99a6; --idle-soft: #1e252d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c1015; --surface: #141a21; --sunk: #1b232c; --ink: #e5ebf1; --muted: #93a0ae; --line: #27313c;
+  --accent: #52b4e8; --accent-soft: #12293a; --ok: #4fc387; --ok-soft: #12291d; --warn: #e3a94d; --warn-soft: #2d2412;
+  --bad: #f07a63; --bad-soft: #321a16; --idle: #8d99a6; --idle-soft: #1e252d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 16px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; animation: none !important; } }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 var(--font-sans); -webkit-font-smoothing: antialiased; }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+code { background: var(--sunk); padding: 0.08em 0.36em; border-radius: 4px; overflow-wrap: anywhere; }
+a { color: var(--accent); }
+h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+h1 { font-size: clamp(1.9rem, 4.2vw, 2.8rem); font-weight: 700; letter-spacing: -0.025em; }
+h2 { font-size: 1.55rem; font-weight: 650; letter-spacing: -0.015em; }
+h3 { font-size: 1.02rem; font-weight: 600; }
+p { margin: 0; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+.shell { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 40px; max-width: 1240px; margin: 0 auto; padding-inline: 24px; padding-block: 32px 80px; }
+.rail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.rail .brand { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.rail a { color: var(--muted); text-decoration: none; padding: 5px 10px; border-radius: 6px; border-left: 2px solid transparent; }
+.rail a:hover { color: var(--ink); background: var(--sunk); }
+.rail a.on { color: var(--ink); border-left-color: var(--accent); background: var(--surface); }
+.rail .num { font-family: var(--font-mono); font-size: 11px; color: var(--idle); margin-right: 6px; }
+main { min-width: 0; display: flex; flex-direction: column; gap: 64px; }
+section { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.eyebrow { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+.lede { font-size: 1.08rem; color: var(--muted); max-width: 68ch; }
+.prose { max-width: 72ch; display: flex; flex-direction: column; gap: 10px; }
+.two { display: flex; flex-direction: column; gap: 8px; max-width: 74ch; }
+.two p { color: var(--ink); }
+.two .tech-label, .two .plain-label { font-weight: 600; }
+.plain { color: var(--muted) !important; }
+.plain strong u { color: var(--ink); text-underline-offset: 3px; }
+
+/* hero */
+.hero { display: flex; flex-direction: column; gap: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* generic panels */
+.figure { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.figure-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.hint { font-size: 12.5px; color: var(--muted); }
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+svg text { font-family: var(--font-sans); }
+.detail { border-top: 1px dashed var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.detail h3 { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.srcs { display: flex; flex-wrap: wrap; gap: 6px; }
+.src { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); background: var(--sunk); border: 1px solid var(--line); border-radius: 5px; padding: 2px 7px; overflow-wrap: anywhere; }
+.src::before { content: "src "; color: var(--accent); }
+.src.doc::before { content: "doc "; color: var(--warn); }
+
+.chip { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 11.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
+.chip.ok { color: var(--ok); background: var(--ok-soft); }
+.chip.warn { color: var(--warn); background: var(--warn-soft); }
+.chip.bad { color: var(--bad); background: var(--bad-soft); }
+.chip.info { color: var(--accent); background: var(--accent-soft); }
+.chip.idle { color: var(--idle); background: var(--idle-soft); }
+.chip.line { color: var(--muted); border-color: var(--line); background: transparent; }
+
+/* roles stack */
+.stack { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 18px; }
+.layers { display: flex; flex-direction: column; gap: 6px; }
+.layer { text-align: left; display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; align-items: start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); cursor: pointer; }
+.layer:hover { border-color: var(--accent); }
+.layer[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.layer .idx { font-family: var(--font-mono); font-size: 12px; color: var(--accent); padding-top: 2px; }
+.layer b { display: block; font-weight: 600; }
+.layer span.s { display: block; font-size: 12.5px; color: var(--muted); }
+.layer-panel { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.owns { display: flex; flex-wrap: wrap; gap: 6px; }
+
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+th { font-size: 11.5px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+td code { font-size: 0.82em; }
+
+/* vocab */
+.vocab { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.term { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.term .tbl { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
+.term .states { display: flex; flex-wrap: wrap; gap: 4px; }
+.attempts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.attempt { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--bg); display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.attempt .mono { color: var(--muted); }
+
+/* sequence */
+.seq-wrap { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 18px; }
+.seq-svg { min-width: 640px; width: 100%; height: auto; display: block; }
+.seq-svg .arrow { cursor: pointer; }
+.seq-svg .arrow line, .seq-svg .arrow path { stroke: var(--idle); stroke-width: 1.4; fill: none; }
+.seq-svg .arrow text { fill: var(--muted); font-size: 11px; font-family: var(--font-mono); }
+.seq-svg .arrow.done line, .seq-svg .arrow.done path { stroke: var(--muted); }
+.seq-svg .arrow.future { opacity: 0.32; }
+.seq-svg .arrow.active line, .seq-svg .arrow.active path { stroke: var(--accent); stroke-width: 2.4; }
+.seq-svg .arrow.active text { fill: var(--accent); font-weight: 500; }
+.seq-svg .arrow .hit { stroke: transparent; stroke-width: 18; }
+.seq-svg .lane-line { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 4; }
+.seq-svg .lane-head rect { fill: var(--sunk); stroke: var(--line); }
+.seq-svg .lane-head text { fill: var(--ink); font-size: 12px; font-weight: 600; }
+.seq-svg .stepnum { fill: var(--idle); font-size: 10.5px; font-family: var(--font-mono); }
+.seq-svg .arrow.active .stepnum { fill: var(--accent); }
+.step-card { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.step-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 7px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+.counter { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-left: auto; }
+.cmd { font-family: var(--font-mono); font-size: 12px; background: var(--sunk); border: 1px solid var(--line); border-radius: 7px; padding: 9px 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rows { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px; color: var(--muted); }
+.progress { height: 3px; background: var(--sunk); border-radius: 2px; overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--accent); transition: width 0.25s; }
+
+/* mailbox */
+.toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; padding: 3px; gap: 3px; background: var(--bg); flex-wrap: wrap; }
+.toggle button { border: 0; background: transparent; padding: 5px 11px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--muted); }
+.toggle button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
+.pipe { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.stage { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--bg); display: flex; flex-direction: column; gap: 6px; min-width: 0; transition: opacity 0.2s, border-color 0.2s; }
+.stage .k { font-family: var(--font-mono); font-size: 11px; color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase; }
+.stage p { font-size: 13px; }
+.stage.off { opacity: 0.35; }
+.stage.hot { border-color: var(--accent); background: var(--accent-soft); }
+
+/* dag */
+.dag-svg { min-width: 640px; width: 100%; height: auto; display: block; }
+.dag-svg .edge { stroke: var(--line); stroke-width: 1.6; fill: none; }
+.dag-svg .edge.met { stroke: var(--ok); }
+.dag-svg .node rect.box { stroke-width: 1.4; }
+.dag-svg .node text { font-size: 12px; }
+.dag-svg .node .t { font-weight: 600; fill: var(--ink); }
+.dag-svg .node .s { font-family: var(--font-mono); font-size: 10.5px; }
+.dag-svg .act { cursor: pointer; }
+.dag-svg .act rect { stroke-width: 1; }
+.dag-svg .act text { font-size: 11px; font-family: var(--font-mono); }
+.dag-log { font-family: var(--font-mono); font-size: 12px; background: var(--sunk); border-radius: 7px; padding: 10px 12px; max-height: 168px; overflow: auto; display: flex; flex-direction: column; gap: 3px; }
+.dag-log .new { color: var(--ink); }
+.dag-log div { color: var(--muted); }
+
+/* boundary */
+.hosts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.host { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.host ul { margin: 0; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 3px; }
+.verdicts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; }
+.verdict-list { display: flex; flex-direction: column; gap: 6px; }
+.vbtn { text-align: left; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding: 9px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.vbtn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.vbtn small { color: var(--muted); font-size: 12px; }
+.allow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.allow > div { border-radius: 8px; padding: 10px 12px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.allow .yes { background: var(--ok-soft); }
+.allow .no { background: var(--bad-soft); }
+.allow h4 { margin: 0; font-size: 11.5px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; }
+.allow .yes h4 { color: var(--ok); }
+.allow .no h4 { color: var(--bad); }
+.allow ul { margin: 0; padding-left: 16px; }
+
+/* ownership */
+.fork { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.fork .opt { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; background: var(--surface); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.fork .opt .cmd { font-size: 11.5px; }
+
+/* ledger */
+.filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.filters button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 12.5px; color: var(--muted); }
+.filters button[aria-pressed="true"] { color: var(--ink); border-color: var(--ink); }
+.filters button .n { font-family: var(--font-mono); font-size: 11px; color: var(--idle); margin-left: 4px; }
+.ledger td:first-child { width: 150px; }
+
+.foot { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; display: flex; flex-direction: column; gap: 6px; }
+
+@media (max-width: 980px) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 20px; padding-inline: 16px; }
+  .rail { position: static; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; gap: 4px; padding-bottom: 4px; }
+  .rail .brand { display: none; }
+  .rail a { white-space: nowrap; border-left: 0; border-bottom: 2px solid transparent; }
+  .rail a.on { border-bottom-color: var(--accent); }
+  .stack, .seq-wrap, .verdicts { grid-template-columns: minmax(0, 1fr); }
+  .pipe { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hosts, .fork { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  .pipe, .allow { grid-template-columns: minmax(0, 1fr); }
+  .figure { padding: 14px; }
+  .ledger td:first-child { width: auto; }
+  main { gap: 48px; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="rail" aria-label="Sections">
+    <div class="brand">Orca · orchestration</div>
+    <a href="#machine"><span class="num">01</span>The machine</a>
+    <a href="#roles"><span class="num">02</span>Who does what</a>
+    <a href="#vocab"><span class="num">03</span>Run, Task, Dispatch</a>
+    <a href="#lifecycle"><span class="num">04</span>One supervised run</a>
+    <a href="#mail"><span class="num">05</span>Messages and ack</a>
+    <a href="#dag"><span class="num">06</span>Dependencies</a>
+    <a href="#boundary"><span class="num">07</span>Where work runs</a>
+    <a href="#ownership"><span class="num">08</span>After completion</a>
+    <a href="#ledger"><span class="num">09</span>Real vs instructed</a>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <div class="eyebrow">Source-backed architecture explainer</div>
+      <h1>Inside Orca Orchestration</h1>
+      <p class="lede">Orca runs coding agents (Claude Code, Codex, Gemini and 37 others) side by side in terminals and worktrees. Its orchestration layer lets one of those agents supervise the others. It does this through a durable ledger and mailbox, which the runtime enforces. There is no hidden scheduler.</p>
+      <div class="two">
+        <p><span class="tech-label">Technical:</span> The coordinator is an ordinary agent CLI that calls <code>orca orchestration …</code>. The CLI sends newline-delimited JSON RPC over a Unix socket (named pipe on Windows) to <code>OrcaRuntimeService</code> in the Electron main process. The runtime writes every Run, Task, Dispatch and Message to one SQLite file, <code>orchestration.db</code>. It checks caller identity on every mutation. It then places worker agents into terminals on the right execution host. The automatic server-side coordinator loop is retired.</p>
+        <p class="plain"><strong><u>In plain terms:</u></strong> One AI agent acts as the manager. It never talks to the other agents directly. It types commands into a small program called <code>orca</code>, and that program asks the Orca app to do the work. The app keeps a written record (a database file) of every job, every attempt and every note. The app also checks that each command really comes from the agent that is allowed to give it. It works like a project office with a ledger and pigeonholes: the manager and the workers both go through the office, and the office refuses anyone who is not on the list.</p>
+      </div>
+      <div class="meta">
+        <span>checkout: Testing-Orca · branch xxuxinn/Testing-Orca · da6d483ab9</span>
+        <span>schema v42</span>
+        <span>built 2026-10-03</span>
+      </div>
+      <div class="legend">
+        <span class="src">path:line = code you can open</span>
+        <span class="src doc">path:line = agent guide or design doc</span>
+      </div>
+    </header>
+
+    <!-- 01 -->
+    <section id="machine">
+      <div class="eyebrow">01 · Process map</div>
+      <h2>The machine Orca runs on</h2>
+      <div class="two">
+        <p><span class="tech-label">Technical:</span> Orca is several cooperating processes. The Electron main process hosts the runtime service, the RPC server, the agent hook server and the orchestration database. A detached terminal daemon owns every local PTY (pseudo-terminal, the program-side half of a terminal window), so agents survive an app restart. Remote work runs either through a relay daemon on an SSH host or on a separate paired Orca runtime.</p>
+        <p class="plain"><strong><u>In plain terms:</u></strong> Orca is not one program. It is a small team of programs. The main app keeps the records and answers requests. A separate background program keeps the terminal windows alive, so your agents keep working even if you restart Orca. Work on other computers goes through a helper program on that computer. Click any box to see what it does and where its code is.</p>
+      </div>
+      <div class="figure">
+        <div class="figure-head"><h3>Processes and the wires between them</h3><span class="hint">Click a box. Scroll sideways on a phone.</span></div>
+        <div class="scroll-x"><svg id="procSvg" class="seq-svg" viewBox="0 0 980 590" role="img" aria-label="Orca process map"></svg></div>
+        <div class="detail" id="procDetail" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <!-- 02 -->
+    <section id="roles">
+      <div class="eyebrow">02 · Division of labour</div>
+      <h2>Who does what in a supervised run</h2>
+      <div class="two">
+        <p><span class="tech-label">Technical:</span> Seven layers take part. Authority flows downward: the human starts supervision, the coordinator agent decides, the CLI carries the request, the runtime checks it and records it, and workers act inside workspaces. Facts flow upward. The execution host owns the facts about processes, files and transcripts, and the runtime only reports them.</p>
+        <p class="plain"><strong><u>In plain terms:</u></strong> Orders go down the list and facts come back up. You give the order. The manager agent plans. The <code>orca</code> program carries the message. The Orca app checks it and writes it down. The worker agents do the job inside a project folder. Only the computer where a worker runs can say for sure whether that worker is still alive.</p>
+      </div>
+      <div class="figure">
+        <div class="stack">
+          <div class="layers" id="layers"></div>
+          <div class="layer-panel" id="layerPanel" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="figure">
+        <div class="figure-head"><h3>Supervision or handoff? The agent decides its role first</h3></div>
+        <div class="scroll-x">
+        <table>
+          <thead><tr><th>Context the agent sees</th><th>Role</th><th>What it uses</th></tr></thead>
+          <tbody>
+            <tr><td>The user asks to supervise, monitor, wait for results, or coordinate a DAG</td><td><span class="chip info">Coordinator</span></td><td>The supervised loop: <code>run-create</code>, <code>worker-start</code>, <code>check --wait</code></td></tr>
+            <tr><td>The prompt has a live injected preamble with Task and Dispatch IDs</td><td><span class="chip warn">Dispatched worker</span></td><td>The preamble's exact commands only</td></tr>
+            <tr><td>The user asks to hand off work without supervision</td><td><span class="chip idle">Handoff owner</span></td><td>The <code>orca-cli</code> skill. Creates no Run, Task or Dispatch.</td></tr>
+            <tr><td>A message carries a legacy authority label</td><td><span class="chip line">Compatibility operator</span></td><td>The legacy contract reference</td></tr>
+            <tr><td>None of the above</td><td><span class="chip line">Ordinary agent</span></td><td>No lifecycle messages</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div class="srcs"><span class="src doc">skill-guides/orchestration.md:33-44</span></div>
+        <p class="plain"><strong><u>In plain terms:</u></strong> A worker whose prompt contains job numbers follows those numbers. An agent asked only to "give this to someone else" passes the job on and walks away, so no records are created. Only an explicit request to supervise turns an agent into a manager.</p>
+      </div>
+    </section>
+
+    <!-- 03 -->
+    <section id="vocab">
+      <div class="eyebrow">03 · Vocabulary</div>
+      <h2>Run, Task, Dispatch and the rest</h2>
+      <div class="two">
+        <p><span class="tech-label">Technical:</span> The core rule is "a Task is work, a Dispatch is one authoritative attempt at it" (<code>types.ts:291</code>: "Dispatch ID is the Attempt identity; retries point to the prior Attempt"). One Task can have many Dispatches over time, but only one may be active (<code>pending</code> or <code>dispatched</code>) at once. Lifecycle authority comes from the active Dispatch. It never comes from a terminal title, a copied ID or an old row. A Run is a namespace plus the coordinator's inbox. It does not schedule or place anything.</p>
+        <p class="plain"><strong><u>In plain terms:</u></strong> A Task is the job ("fix the login bug"). A Dispatch is one try at that job by one worker. If the first worker fails, a second try gets a new Dispatch number but keeps the same Task. Only the current try can report "done". A Run is the folder that holds all of the manager's jobs and its inbox.</p>
+      </div>
+      <div class="vocab" id="vocabGrid"></div>
+      <div class="figure">
+        <div class="figure-head"><h3>One Task, several Dispatches</h3><span class="hint">The failure count carries forward between attempts</span></div>
+        <div class="attempts">
+          <div class="attempt"><span class="mono">task_42 · "integration tests"</span><b>Task</b><span><span class="chip info">ready</span> → <span class="chip warn">dispatched</span></span></div>
+          <div class="attempt"><span class="mono">dispatch A · attempt 1</span><span><span class="chip bad">failed</span> failure_count 1</span><span class="hint">Task returns to <code>ready</code>, not <code>pending</code></span></div>
+          <div class="attempt"><span class="mono">dispatch B · --retry-of A</span><span><span class="chip bad">failed</span> failure_count 2</span><span class="hint">Placement is never silently inherited</span></div>
+          <div class="attempt"><span class="mono">dispatch C · --retry-of B</span><span><span class="chip bad">circuit_broken</span> failure_count 3</span><span class="hint">Task becomes <code>failed</code>. A new Run does not reset this.</span></div>
+        </div>
+        <div class="srcs">
+          <span class="src">src/main/runtime/orchestration/db/dispatch-context/dispatch-circuit-breaker.ts:2</span>
+          <span class="src">src/main/runtime/orchestration/db/dispatch-context/dispatch-completion.ts:111-219</span>
+          <span class="src">src/main/runtime/orchestration/db/dispatch-context/dispatch-context-store.ts:51-55</span>
+          <span class="src doc">skill-guides/orchestration/references/recovery-and-cleanup.md:110-122</span>
+        </div>
+        <p class="plain"><strong><u>In plain terms:</u></strong> Orca counts failed tries per job. After the third failure it stops the job for good. This is a circuit breaker: like a fuse in a house, it cuts power before a fault repeats forever.</p>
+      </div>
+    </section>
+
+    <!-- 04 -->
+    <section id="lifecycle">
+      <div class="eyebrow">04 · Walkthrough</div>
+      <h2>One supervised run, step by step</h2>
+      <div class="two">
+        <p><span class="tech-label">Technical:</span> This is the canonical loop from the orchestration guide, traced through the code that runs each step. Each step names the CLI command, the database tables it touches and the source lines. Use the buttons or the arrow keys, or click an arrow in the diagram.</p>
+        <p class="plain"><strong><u>In plain terms:</u></strong> This follows one job from your request to the final report, one message at a time. Each arrow is one message between two parties. Click through the steps in order.</p>
+      </div>
+      <div class="figure">
+        <div class="seq-wrap">
+          <div class="scroll-x"><svg id="seqSvg" class="seq-svg" role="img" aria-label="Sequence diagram of a supervised run"></svg></div>
+          <div class="step-card">
+            <div class="progress"><i id="seqBar"></i></div>
+            <div class="step-nav">
+              <button class="btn" id="seqPrev" type="button">← Prev</button>
+              <button class="btn primary" id="seqNext" type="button">Next →</button>
+              <span class="counter" id="seqCount"></span>
+            </div>
+            <div id="stepBody" class="step-card" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05 -->
+    <section id="mail">
+      <div class="eyebrow">05 · Messaging</div>
+      <h2>How a message travels, and what "acknowledged" means</h2>
+      <div class="two">
+        <p><span class="tech-label">Technical:</span> <code>send</code> succeeds once the message row is committed. That proves durable enqueue only. Attention is a separate, best-effort step: either a parked long-poll waiter wakes, or Orca types a one-line pointer into the recipient's terminal. The coordinator consumes its Run inbox with <code>check</code>. This creates a <em>Delivery</em>: the oldest FIFO batch of up to 50 messages. The same batch replays until the coordinator sends <code>--ack</code>. A SQLite trigger allows only one outstanding Delivery per mailbox.</p>
+        <p class="plain"><strong><u>In plain terms:</u></strong> When an agent sends a note, Orca first files it. Filing is guaranteed. Telling the recipient is not: Orca either wakes a waiting manager or types "You have 2 orchestration messages" into the worker's terminal. The manager picks up notes in batches, oldest first. Orca keeps handing over the same batch until the manager signs for it, like a registered letter that is redelivered until someone signs.</p>
+      </div>
+      <div class="figure">
+        <div class="figure-head">
+          <h3>Two delivery paths</h3>
+          <div class="toggle" role="group" aria-label="Recipient state">
+            <button type="button" data-mode="wait" aria-pressed="true">Coordinator is waiting</button>
+            <button type="button" data-mode="busy" aria-pressed="false">Recipient is busy</button>
+          </div>
+        </div>
+        <div class="pipe" id="pipe"></div>
+        <p class="hint" id="pipeNote"></p>
+      </div>
+      <div class="figure">
+        <div class="figure-head"><h3>Addresses</h3></div>
+        <div class="scroll-x">
+        <table>
+          <thead><tr><th>Address</th><th>Who reads it</th><th>Used for</th></tr></thead>
+          <tbody>
+            <tr><td><code>run:&lt;id&gt;</code></td><td>The bound coordinator</td><td>Worker reports, questions, escalations. Consumed through Deliveries.</td></tr>
+            <tr><td><code>dispatch:&lt;id&gt;</code></td><td>The worker holding that attempt</td><td>Coordinator follow-ups and replies. Stays valid on remote hosts, unlike a terminal handle.</td></tr>
+            <tr><td><code>term_…</code> handle</td><td>One terminal</td><td>Direct mail. Legacy rows here are inspect-only.</td></tr>
+            <tr><td><code>@all @idle @claude @codex @opencode @gemini @droid @grok @cursor</code></td><td>Live Dispatches of the sender's own Run</td><td>Deliberate fan-out. Never for <code>worker_done</code> or heartbeats.</td></tr>
+            <tr><td><code>@worktree:&lt;id&gt;</code></td><td>Terminals in that workspace, coordinators included</td><td>Workspace-wide notices</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div class="srcs">
+          <span class="src">src/main/runtime/orchestration/mailbox-notification-coordinator.ts:48-75</span>
+          <span class="src">src/main/runtime/orca-runtime-deliver-pending-messages.ts:9-189</span>
+          <span class="src">src/main/runtime/orchestration/mailbox-pointer-delivery.ts:54</span>
+          <span class="src">src/main/runtime/orchestration/formatter.ts:112-122</span>
+          <span class="src">src/main/runtime/rpc/methods/orchestration/messaging/check-run.ts:131-132</span>
+          <span class="src">src/main/runtime/orchestration/db/schema/migrate-v41.ts:11-27</span>
+          <span class="src">src/main/runtime/runtime-message-waiters.ts:13-143</span>
+          <span class="src doc">skill-guides/orchestration/references/messaging-and-gates.md:6-53</span>
+        </div>
+      </div>
+      <div class="figure">
+        <div class="figure-head"><h3>Questions, heartbeats and gates</h3></div>
+        <div class="scroll-x">
+        <table>
+          <thead><tr><th>Mechanism</th><th>What the code does</th><th>What it does not prove</th></tr></thead>
+          <tbody>
+            <tr><td><code>ask</code> / <code>reply</code></td><td>Creates a <code>question_threads</code> row, then blocks on <code>dispatch:&lt;id&gt;</code>. Default timeout 600 s, maximum 1,800 s. On timeout the question stays pending, and the worker resumes it by message ID.</td><td>A timeout is not "no answer". Never create a duplicate question.</td></tr>
+            <tr><td><code>heartbeat</code></td><td>Updates <code>last_heartbeat_at</code>, but only for a <code>dispatched</code> attempt. In the live path nothing acts on staleness. The 10-minute hung check lives only in the retired loop.</td><td>Alive, not done</td></tr>
+            <tr><td><code>escalation</code></td><td>A typed message to the coordinator before completion</td><td>Not a failure report</td></tr>
+            <tr><td><code>gate-create</code> / <code>gate-resolve</code></td><td>A coordinator-owned decision on a Task. The Task is blocked until resolution, then set back to <code>ready</code>.</td><td>Not a way to answer an <code>ask</code></td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div class="srcs">
+          <span class="src">src/main/runtime/rpc/methods/orchestration/messaging/ask-methods.ts:106-175</span>
+          <span class="src">src/shared/orchestration-ask-timeout.ts</span>
+          <span class="src">src/main/runtime/orchestration/db/dispatch-context/dispatch-completion.ts:87-109</span>
+          <span class="src">src/main/runtime/orchestration/coordinator-task-dispatch.ts:16-27</span>
+          <span class="src">src/main/runtime/orchestration/coordinator-decision-gates.ts:52-62</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 06 -->
+    <section id="dag">
+      <div class="eyebrow">06 · Dependencies and parallel work</div>
+      <h2>Task DAGs and ready waves</h2>
+      <div class="two">
+        <p><span class="tech-label">Technical:</span> <code>task-create --deps</code> stores a JSON array of Task IDs. One SQL <code>CASE</code> inserts the Task as <code>ready</code> only if every dependency exists, is in the same Run and is <code>completed</code>. Otherwise it inserts it as <code>pending</code>. When a Task completes, <code>promoteReadyTasks</code> runs in the same transaction and moves each newly unblocked dependent to <code>ready</code>. The live path has no global concurrency cap. Parallelism is one active Dispatch per pane, plus as many workers as the coordinator chooses to start. Nested workers have a depth limit of 1 by default.</p>
+        <p class="plain"><strong><u>In plain terms:</u></strong> Some jobs must wait for others ("test" waits for "build"). Orca marks a job "ready" only when every job it waits for is finished. Jobs that do not wait for anything can run at the same time. Try it below: start the ready jobs, then mark each one done or failed, and watch the waiting jobs unlock.</p>
+      </div>
+      <div class="figure">
+        <div class="figure-head">
+          <h3>DAG simulator</h3>
+          <div class="step-nav">
+            <button class="btn primary" id="dagWave" type="button">worker-start every ready Task</button>
+            <button class="btn" id="dagReset" type="button">Reset</button>
+          </div>
+        </div>
+        <div class="scroll-x"><svg id="dagSvg" class="dag-svg" viewBox="0 0 780 330" role="img" aria-label="Task dependency graph simulator"></svg></div>
+        <div class="dag-log" id="dagLog" aria-live="polite"></div>
+        <p class="hint">This simulates the state rules on example tasks. It does not call Orca. Rules: <code>task-store.ts:48-66, 211-235</code> · <code>dispatch-completion.ts:111-219</code> · <code>dispatch-circuit-breaker.ts:2</code> · <code>nested-worker-depth.ts:8</code>.</p>
+      </div>
+    </section>
+
+    <!-- 07 -->
+    <section id="boundary">
+      <div class="eyebrow">07 · Execution boundary</div>
+      <h2>Local, SSH and paired runtimes</h2>
+      <div class="two">
+        <p><span class="tech-label">Technical:</span> An execution host is <code>local</code>, <code>ssh:&lt;target&gt;</code> or <code>runtime:&lt;env&gt;</code>. WSL is a local variant that runs through <code>wsl.exe --exec</code>. The rule is that the execution host owns tools, credentials, processes and artifacts. Orchestration state always stays on the coordinator's runtime. <code>worker-start --on &lt;env&gt;</code> chooses only where the worker executes. Loss of contact produces <code>unverifiable</code>, never <code>exited</code>, and never a silent local fallback.</p>
+        <p class="plain"><strong><u>In plain terms:</u></strong> The ledger always stays on your Mac, even when a worker runs on another computer. Only that other computer can say whether its worker is alive. If the connection drops, Orca says "I can't tell", not "it died". Orca also never quietly moves the job to your Mac instead.</p>
+      </div>
+      <div class="hosts">
+        <div class="host">
+          <h3>Local (and WSL)</h3>
+          <span class="chip info">host id: local</span>
+          <ul>
+            <li>PTYs live in the detached terminal daemon</li>
+            <li>Hooks post to <code>127.0.0.1:$ORCA_AGENT_HOOK_PORT</code></li>
+            <li>WSL: argv built with <code>buildWslExecArgs</code>, hooks via a guest-side relay</li>
+            <li>Structured workers (Claude, Codex only) run here only</li>
+          </ul>
+          <div class="srcs"><span class="src">src/shared/execution-host.ts:5-16</span><span class="src doc">docs/reference/wsl-command-execution.md:8-29</span></div>
+        </div>
+        <div class="host">
+          <h3>SSH host</h3>
+          <span class="chip warn">host id: ssh:&lt;target&gt;</span>
+          <ul>
+            <li>A relay daemon (<code>src/relay</code>) runs PTYs, git, files and hooks there, detached with <code>nohup</code></li>
+            <li>Remote <code>orca</code> is a shim that proxies back to your runtime. It fails with "No owning Orca client is connected" when you are offline.</li>
+            <li>Quitting Orca detaches and does not kill. Reconnect replays the output tail.</li>
+          </ul>
+          <div class="srcs"><span class="src">src/relay/relay.ts:3</span><span class="src doc">docs/reference/ssh-execution-boundary.md:22-57</span></div>
+        </div>
+        <div class="host">
+          <h3>Paired runtime (federation)</h3>
+          <span class="chip ok">host id: runtime:&lt;env&gt;</span>
+          <ul>
+            <li>Another Orca (<code>orcad</code> or <code>orca serve</code>) with its own control plane, paired over an encrypted WebSocket</li>
+            <li><code>worker-start --on</code> calls <code>orchestration.federationAttachStart</code> on the peer</li>
+            <li>Mail is pulled, imported and acked per Dispatch every 1 s. Read, stop and release go by Dispatch ID.</li>
+            <li>Remote <code>current</code> and <code>new-child</code> are refused as ambiguous</li>
+          </ul>
+          <div class="srcs"><span class="src">src/main/runtime/rpc/methods/orchestration/federation/federated-worker-start.ts:165-166</span><span class="src">src/main/runtime/orchestration/federation-sync.ts:40-236</span><span class="src doc">skill-guides/orchestration/references/placement-and-remote.md:46-71</span></div>
+        </div>
+      </div>
+      <div class="figure">
+        <div class="figure-head"><h3>What a liveness verdict lets the coordinator do</h3><span class="hint">Pick a verdict</span></div>
+        <div class="verdicts">
+          <div class="verdict-list" id="verdictList"></div>
+          <div id="verdictBody" aria-live="polite" class="layer-panel"></div>
+        </div>
+        <div class="srcs">
+          <span class="src">src/shared/pty-liveness-verdict.ts:9-12</span>
+          <span class="src">src/main/runtime/unstopped-pty-verification.ts:17-29</span>
+          <span class="src doc">skill-guides/orchestration/references/recovery-and-cleanup.md:6-63</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 08 -->
+    <section id="ownership">
+      <div class="eyebrow">08 · Post-completion</div>
+      <h2>After <code>worker_done</code>: who owns the terminal?</h2>
+      <div class="two">
+        <p><span class="tech-label">Technical:</span> A valid <code>worker_done</code> settles the Task and the Dispatch in one transaction. It revokes the capability, closes open questions and promotes dependents. The coordinator must then choose one of three next owners for the worker terminal before it acks the Delivery. Release is post-settlement cleanup, not cancellation. The database refuses to release an unsettled worker. Release archives the output, then closes only the exact agent terminal that the settled Dispatch owns. Orchestration never deletes a worktree.</p>
+        <p class="plain"><strong><u>In plain terms:</u></strong> When a worker says "done", the job is closed and the worker's pass is cancelled. The manager must then decide what happens to that worker's terminal: give it the next job, keep it open because you asked, or close it. Closing saves a copy of everything the worker wrote first. Orca never deletes the project folder itself.</p>
+      </div>
+      <div class="fork">
+        <div class="opt"><span class="chip ok">reuse</span><h3>Same agent, next Task</h3><p>Transfers cleanup ownership to the new Dispatch.</p><div class="cmd">orca orchestration worker-start --task &lt;next&gt; --terminal &lt;handle&gt;</div></div>
+        <div class="opt"><span class="chip info">retain</span><h3>User asked to keep it</h3><p>Records <code>user_requested</code>. The terminal stays live.</p><div class="cmd">orca orchestration worker-retain --dispatch &lt;id&gt;</div></div>
+        <div class="opt"><span class="chip idle">release</span><h3>Archive and close</h3><p>Archives output into <code>worker_terminal_archives</code>, then closes the exact terminal. Safe to replay.</p><div class="cmd">orca orchestration worker-release --dispatch &lt;id&gt;</div></div>
+      </div>
+      <div class="figure">
+        <div class="figure-head"><h3>Stop, abandon, release: three different verbs</h3></div>
+        <div class="scroll-x">
+        <table>
+          <thead><tr><th>Verb</th><th>When</th><th>Process action</th><th>Never touches</th></tr></thead>
+          <tbody>
+            <tr><td><code>worker-stop</code></td><td>An active attempt, after positive evidence</td><td>Closes the exact proven agent terminal</td><td>Worktree, setup terminal, configured tabs, other processes</td></tr>
+            <tr><td><code>worker-abandon</code></td><td><code>outcome_unknown</code> after inspection</td><td>None. Fences orchestration only.</td><td>Anything remote, any process or file</td></tr>
+            <tr><td><code>worker-release</code></td><td>Only after an accepted settlement</td><td>Archives, then closes the owned terminal</td><td>Reused, pre-existing, setup, coordinator, user-taken-over or unproven terminals</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p class="hint">Ownership states: <span class="chip info">owned</span> <span class="chip ok">transferred</span> <span class="chip warn">user_owned</span> <span class="chip line">external</span> <span class="chip idle">released</span>. If you type in a worker's terminal, <code>workerTerminalUserInput</code> durably moves it to <code>user_owned</code>.</p>
+        <div class="srcs">
+          <span class="src">src/main/runtime/orchestration/db/dispatch-context/worker-report-settlement.ts:55-280</span>
+          <span class="src">src/main/runtime/orchestration/db/worker-terminal/worker-terminal-release.ts:15-75</span>
+          <span class="src">src/main/runtime/rpc/methods/orchestration/worker/worker-release.ts:16-153</span>
+          <span class="src">src/main/runtime/orchestration/worker-terminal-ownership.ts:3-26</span>
+          <span class="src doc">skill-guides/orchestration.md:159-174</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 09 -->
+    <section id="ledger">
+      <div class="eyebrow">09 · Status ledger</div>
+      <h2>Enforced in code, asked of agents, retired, or planned</h2>
+      <div class="two">
+        <p><span class="tech-label">Technical:</span> Much of what an agent "must" do lives only in the skill guide that Orca compiles into the binary (<code>src/cli/bundled-skill-guides.ts</code>, served by <code>orca skills get orchestration</code>). This ledger separates the guarantees the runtime enforces from the rules it asks agents to follow. It also lists retired paths that still exist in the code and mechanisms that are planned or unwired.</p>
+        <p class="plain"><strong><u>In plain terms:</u></strong> Some rules are locks: the program refuses to break them. Other rules are instructions: the agent is told to follow them, but nothing stops it. This table shows which is which, plus old parts that are switched off and new parts that are not finished.</p>
+      </div>
+      <div class="figure">
+        <div class="filters" id="filters" role="group" aria-label="Filter ledger"></div>
+        <div class="scroll-x"><table class="ledger"><thead><tr><th>Status</th><th>Claim</th><th>Evidence</th></tr></thead><tbody id="ledgerBody"></tbody></table></div>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <p>Every reference points into this checkout. Lines marked <span class="src doc">doc</span> are instructions or design notes. Lines marked <span class="src">src</span> are code that runs. Where a claim rests on one search for something missing, the ledger marks it "unverified".</p>
+      <p>Saved as <code>outputs/claude-orca-orchestration.html</code>. The Codex versions in <code>outputs/</code> were not changed.</p>
+    </footer>
+  </main>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, parent) {
+    var n = document.createElementNS(NS, tag);
+    for (var k in attrs) {
+      var v = attrs[k];
+      // SVG presentation attributes ignore var(), so theme tokens go through style.
+      if (typeof v === "string" && v.indexOf("var(") === 0) n.style.setProperty(k, v);
+      else n.setAttribute(k, v);
+    }
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+  function srcs(list) {
+    return '<div class="srcs">' + list.map(function (s) {
+      var doc = /^(docs|skill-guides|skills|mobile\/README|cloud\/README)/.test(s);
+      return '<span class="src' + (doc ? " doc" : "") + '">' + s + "</span>";
+    }).join("") + "</div>";
+  }
+  function twoLayer(tech, plain) {
+    return '<div class="two"><p><span class="tech-label">Technical:</span> ' + tech + '</p><p class="plain"><strong><u>In plain terms:</u></strong> ' + plain + "</p></div>";
+  }
+  function store(key, val) { try { if (val === undefined) return localStorage.getItem(key); localStorage.setItem(key, val); } catch (e) { return null; } }
+
+  /* ---------- 01 process map ---------- */
+  var PROC = [
+    { id: "renderer", x: 20, y: 30, w: 180, h: 96, t: "Renderer UI", s: ["React · xterm panes", "sidebar · browser"],
+      tech: "The React UI: sidebar, xterm terminal panes and the built-in browser. It reaches the main process only through the typed <code>window.api</code> that the preload script exposes with <code>contextBridge</code>. It is never the authority on execution state, and a remote path must not fall back to a local read.",
+      plain: "This is the window you look at. It shows terminals and lists, but it does not decide anything. It asks the main app for every fact.",
+      src: ["src/preload/index.ts:192", "src/renderer/src"] },
+    { id: "main", x: 230, y: 20, w: 520, h: 232, t: "Electron main process", s: [], group: true,
+      tech: "Starts the app, registers IPC handlers and hosts <code>OrcaRuntimeService</code>. The service owns git, worktrees, persistence and orchestration. The same service can also run headless as <code>orcad</code>.",
+      plain: "This is the heart of Orca. It keeps the records, runs git and answers every request from the window, the phone and the <code>orca</code> program.",
+      src: ["src/main/index.ts:114-121", "src/main/startup/main-process-runtime-service.ts:76", "src/main/orcad/orcad-entry.ts:202"] },
+    { id: "service", x: 250, y: 50, w: 480, h: 38, t: "OrcaRuntimeService", s: [], inner: true, alias: "main" },
+    { id: "db", x: 250, y: 100, w: 150, h: 136, t: "orchestration.db", s: ["SQLite · WAL", "schema v42"],
+      tech: "One SQLite file at <code>&lt;userData&gt;/orchestration.db</code>, created lazily, in WAL mode with <code>busy_timeout=5000</code>. Tables include <code>runs</code>, <code>tasks</code>, <code>dispatch_contexts</code>, <code>messages</code>, <code>deliveries</code>, <code>question_threads</code>, <code>decision_gates</code>, <code>worker_dispatches</code>, <code>worker_terminal_resources</code>, <code>worker_terminal_archives</code>, <code>mutation_receipts</code> and the federation tables. A \"worker\" is not its own table. It is a <code>worker_dispatches</code> row plus a <code>worker_terminal_resources</code> row.",
+      plain: "This is the ledger. Every job, every try, every note and every terminal handed out is written here. Because it is a file on disk, the records survive a crash or a restart.",
+      src: ["src/main/runtime/orca-runtime-automation-operations.ts:153-161", "src/main/runtime/orchestration/db/orchestration-db.ts:26-38", "src/main/runtime/orchestration/db/contract-constants.ts:22", "src/main/runtime/orchestration/db/schema/create-core-tables-sql.ts", "src/main/runtime/orchestration/db/schema/create-graph-tables-sql.ts"] },
+    { id: "git", x: 415, y: 100, w: 150, h: 60, t: "Git · worktrees", s: ["lineage"],
+      tech: "Creates worktrees (<code>WorktreeCreate</code> params: repo, base branch, parent selectors, <code>orchestrationContext</code>, setup decision, startup agent). It records parent/child lineage with <code>origin: orchestration|cli|manual</code>, and rejects cycles and cross-host parents. Folder workspaces are first-class and never require git.",
+      plain: "This part makes the separate project copies (worktrees) that let agents work side by side without overwriting each other. It also remembers which copy was made from which.",
+      src: ["src/shared/rpc-contract/worktree-create-params.ts:21-125", "src/main/git/worktree-add.ts:190", "src/main/runtime/runtime-worktree-lineage-controller.ts:30-108", "src/shared/folder-workspace-types.ts:15"] },
+    { id: "hooks", x: 415, y: 172, w: 150, h: 64, t: "Agent hook server", s: ["status store"],
+      tech: "A loopback HTTP server on a random port. Each agent's managed hook script POSTs to <code>/hook/&lt;source&gt;</code> with its pane key and launch token. It fails open with a 204, so a broken hook never blocks the agent. It is the single agent-status store (<code>working</code>, <code>blocked</code>, <code>waiting</code>, <code>done</code>), persisted to <code>last-status.json</code>. 16 agent CLIs have managed hooks.",
+      plain: "Agents report \"I'm working\" or \"I'm waiting for you\" to this small listener. The sidebar, the phone app and <code>worker-list</code> all read the same list, so they always agree.",
+      src: ["src/main/agent-hooks/server/server-lifecycle.ts:148-175", "src/main/agent-hooks/hook-post-command.ts:4-36", "src/main/agent-hooks/managed-agent-hook-registry.ts:41-58", "docs/reference/agent-status-store.md:29-57"] },
+    { id: "rpc", x: 580, y: 100, w: 150, h: 136, t: "Runtime RPC server", s: ["Unix socket / pipe", "WebSocket :6768"],
+      tech: "<code>OrcaRuntimeRpcServer</code> listens on <code>&lt;userData&gt;/o-&lt;pid&gt;-&lt;suffix&gt;.sock</code> (Windows: <code>\\\\.\\pipe\\orca-…</code>) and, optionally, on a WebSocket (port 6768, dev 6769) that binds to loopback until a device is paired. A 24-byte random auth token and the endpoint are published in <code>orca-runtime.json</code>. Pipeline: method lookup → contract fence → session caller → durable mutation executor. Mutations are idempotent through <code>mutation_receipts</code>. Long-polls may use 16 of 32 slots, with a 10 s keepalive.",
+      plain: "This is Orca's front desk. The <code>orca</code> program and the phone app send requests here. Each request must carry a secret password that only programs on this machine can read. If the same request arrives twice, the desk recognises it and does not do the work twice.",
+      src: ["src/main/startup/main-process-runtime-launch.ts:75-95", "src/main/runtime/runtime-rpc/runtime-rpc-socket-metadata.ts:53-60", "src/main/runtime/runtime-rpc/runtime-rpc-state.ts:51", "src/main/runtime/rpc/dispatcher.ts:59-135", "src/main/runtime/rpc/orchestration-mutation-executor.ts:48", "src/main/runtime/runtime-rpc/runtime-rpc-long-poll.ts:3-6"] },
+    { id: "mobile", x: 780, y: 30, w: 180, h: 96, t: "Mobile · cloud relay", s: ["React Native", "E2EE WebSocket"],
+      tech: "The React Native companion reaches the desktop WebSocket RPC directly, or through the hosted cloud relay. In the relay case, phone and desktop each open an outbound WebSocket and the relay splices the frames together. Push notifications go through APNs/FCM.",
+      plain: "The phone app talks to the same front desk, either directly or through a relay service in the cloud. That is how you can steer agents from your phone.",
+      src: ["mobile/README.md:5-8", "cloud/README.md:3-30"] },
+    { id: "daemon", x: 230, y: 290, w: 340, h: 130, t: "Terminal daemon", s: [], group: true,
+      tech: "Owns every local PTY. It is detached from the main process, so PTYs survive an app restart. It speaks NDJSON over <code>daemon-v&lt;N&gt;.sock</code> (protocol version 36). New sessions go to the current daemon, and legacy adapters keep old session IDs working.",
+      plain: "This background program holds the terminal windows open. If Orca restarts or updates, your agents keep running because this program never stopped.",
+      src: ["src/main/daemon/daemon-spawner.ts:128-139", "src/main/daemon/daemon-protocol-version.ts:3", "src/main/daemon/daemon-pty-router.ts:61-73", "docs/reference/orcad-operations.md:9-22"] },
+    { id: "agents", x: 250, y: 324, w: 300, h: 80, t: "Agent CLIs in PTYs", s: ["claude · codex · gemini · …", "coordinator and workers alike"],
+      tech: "An agent is just a process in a PTY. The <code>TuiAgent</code> union lists 40 CLIs. Each PTY gets identity variables (<code>ORCA_TERMINAL_HANDLE</code>, <code>ORCA_PANE_KEY</code>, <code>ORCA_TAB_ID</code>, <code>ORCA_WORKTREE_ID</code>, <code>ORCA_AGENT_LAUNCH_TOKEN</code>) and hook variables. Claude and Codex can also run as structured sessions without a PTY.",
+      plain: "The coordinator and the workers are the same kind of thing: an AI tool running in a terminal. Orca gives each terminal a name tag and a secret token, so it can later check who is calling.",
+      src: ["src/shared/tui-agent.ts:3-42", "src/main/runtime/orca-runtime-create-terminal.ts:74-80", "src/main/runtime/structured-worker-child-identity-env.ts:43-58"] },
+    { id: "cli", x: 600, y: 290, w: 150, h: 130, t: "orca CLI", s: ["30 orchestration", "subcommands"],
+      tech: "Reads <code>orca-runtime.json</code> for the socket and token, then sends newline-delimited JSON over <code>net.createConnection</code>. Every request carries <code>authToken</code>, <code>orchestrationContractVersion</code>, <code>orchestrationRequestId</code> and caller evidence from the terminal's environment. Before any mutation it checks that the runtime advertises <code>orchestration.contract.v1</code>. It switches to the WebSocket transport for remote runtimes.",
+      plain: "This is the small command-line program agents type into. It finds the running Orca app, attaches the terminal's name tag and secret token, and passes the request on.",
+      src: ["src/cli/handler-group-manifest.ts:104-137", "src/cli/runtime/transport.ts:24-34", "src/cli/runtime/transport.ts:195-206", "src/cli/runtime/client.ts:98-100", "src/shared/orchestration-compatibility-evidence.ts:3-9"] },
+    { id: "relay", x: 230, y: 455, w: 340, h: 120, t: "SSH host · relay daemon", s: ["PTYs · git · files · hooks", "orca shim → your runtime"],
+      tech: "A daemon deployed to the SSH host that runs git, the filesystem, PTYs and agent hooks there, over framed JSON-RPC on SSH channels. It is detached with <code>nohup</code> and ignores SIGHUP. The remote <code>orca</code> is a shim (<code>~/.orca-relay/bin/orca</code>) that proxies to your client runtime. Orchestration state stays on the client.",
+      plain: "On a remote server, Orca installs a helper program that does the real work there. When a remote agent types <code>orca</code>, the helper forwards the command back to the Orca app on your Mac, which keeps the ledger.",
+      src: ["src/relay/relay.ts:3", "src/main/providers/ssh-pty-provider.ts:1-35", "docs/reference/ssh-execution-boundary.md:22-57"] },
+    { id: "paired", x: 600, y: 455, w: 360, h: 120, t: "Paired runtime · orcad", s: ["its own control plane", "federated workers via --on"],
+      tech: "A separate Orca runtime (<code>orcad</code> or <code>orca serve</code>) paired over an E2EE WebSocket. <code>worker-start --on &lt;env&gt;</code> calls <code>orchestration.federationAttachStart</code> there. The home runtime keeps the Run and Tasks. The peer records a remote attachment keyed by the home fingerprint and relays mail every second. A machine is either an SSH host or a paired runtime, never both.",
+      plain: "This is a whole second Orca on another machine. Your Orca can ask it to run a worker. Your Orca still keeps the job list, and the two copy messages to each other every second.",
+      src: ["src/main/orcad/orcad-entry.ts:190-293", "src/main/runtime/rpc/methods/orchestration/federation/federated-worker-start.ts:165-166", "docs/reference/headless-linux-server.md:3-45", "docs/reference/ssh-execution-boundary.md:125-129"] }
+  ];
+  var EDGES = [
+    { d: "M200,78 H230", l: "IPC via preload", lx: 110, ly: 146 },
+    { d: "M870,126 V170 H750", l: "WebSocket", lx: 878, ly: 152, anchor: "start" },
+    { d: "M675,290 V236", l: "NDJSON · socket", lx: 680, ly: 268, anchor: "start" },
+    { d: "M550,350 H600", l: "runs", lx: 575, ly: 342 },
+    { d: "M490,324 V236", l: "hook POST", lx: 496, ly: 270, anchor: "start" },
+    { d: "M300,290 V252", l: "PTY stream", lx: 306, ly: 276, anchor: "start" },
+    { d: "M230,515 H206 V140 H230", l: "SSH channels", lx: 200, ly: 330, anchor: "end" },
+    { d: "M960,515 H972 V200 H750", l: "federation", lx: 968, ly: 330, anchor: "end" }
+  ];
+  function drawProc() {
+    var svg = document.getElementById("procSvg");
+    var defs = el("defs", {}, svg);
+    var m = el("marker", { id: "pa", viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto-start-reverse" }, defs);
+    el("path", { d: "M0,0 L10,5 L0,10 z", fill: "var(--muted)" }, m);
+    PROC.forEach(function (n) {
+      var g = el("g", { "data-id": n.alias || n.id, tabindex: n.inner ? "-1" : "0", role: "button", "aria-label": n.t, class: "pnode" }, svg);
+      g.style.cursor = "pointer";
+      el("rect", { x: n.x, y: n.y, width: n.w, height: n.h, rx: n.group ? 12 : 8,
+        fill: n.group ? "var(--bg)" : (n.inner ? "var(--sunk)" : "var(--surface)"),
+        stroke: n.group ? "var(--line)" : "var(--line)", "stroke-dasharray": n.group ? "5 4" : "", "stroke-width": 1.3, class: "pbox" }, g);
+      var title = el("text", { x: n.x + 12, y: n.y + (n.inner ? 24 : 22), "font-size": n.group ? 12 : 13, "font-weight": 600, fill: n.group ? "var(--muted)" : "var(--ink)" }, g);
+      title.textContent = n.inner ? "OrcaRuntimeService · owns git, worktrees, persistence, orchestration" : n.t;
+      if (n.inner) title.setAttribute("font-size", "12");
+      n.s.forEach(function (line, i) {
+        var t = el("text", { x: n.x + 12, y: n.y + 42 + i * 16, "font-size": 11, fill: "var(--muted)", "font-family": "var(--font-mono)" }, g);
+        t.textContent = line;
+      });
+    });
+    EDGES.forEach(function (e) {
+      el("path", { d: e.d, fill: "none", stroke: "var(--muted)", "stroke-width": 1.4, "marker-end": "url(#pa)", "marker-start": "url(#pa)" }, svg);
+      var t = el("text", { x: e.lx, y: e.ly, "font-size": 10.5, fill: "var(--accent)", "font-family": "var(--font-mono)", "text-anchor": e.anchor || "middle" }, svg);
+      t.textContent = e.l;
+    });
+    function pick(id) {
+      var n = PROC.filter(function (p) { return p.id === id; })[0];
+      if (!n) return;
+      svg.querySelectorAll(".pnode").forEach(function (g) {
+        var on = g.getAttribute("data-id") === id;
+        var r = g.querySelector(".pbox");
+        r.style.stroke = on ? "var(--accent)" : "var(--line)";
+        r.style.strokeWidth = on ? "2.4" : "1.3";
+      });
+      document.getElementById("procDetail").innerHTML = "<h3>" + n.t + "</h3>" + twoLayer(n.tech, n.plain) + srcs(n.src);
+    }
+    svg.addEventListener("click", function (ev) {
+      var g = ev.target.closest(".pnode");
+      if (g) pick(g.getAttribute("data-id"));
+    });
+    svg.addEventListener("keydown", function (ev) {
+      if ((ev.key === "Enter" || ev.key === " ") && ev.target.classList.contains("pnode")) { ev.preventDefault(); pick(ev.target.getAttribute("data-id")); }
+    });
+    pick("db");
+  }
+
+  /* ---------- 02 roles ---------- */
+  var ROLES = [
+    { t: "Human", s: "Starts supervision, receives the report, can take over", owns: ["the request", "final say", "takeovers"],
+      tech: "You start supervision with an explicit request, and the turn ends only when the coordinator reports each Task's outcome, evidence and blockers. If you type into a worker's terminal, <code>orchestration.workerTerminalUserInput</code> durably hands that terminal to you (<code>user_owned</code>), and release will not close it.",
+      plain: "You ask for supervised work and you get a report per job at the end. If you type in a worker's window yourself, Orca notes that the window is now yours and will not close it.",
+      src: ["skill-guides/orchestration.md:18-31", "src/main/runtime/rpc/methods/orchestration/worker/worker-release.ts:134-153"] },
+    { t: "Coordinator agent", s: "An ordinary agent CLI asked to supervise", owns: ["decomposition", "task specs", "reply / release decisions"],
+      tech: "Any agent CLI in an Orca terminal (or a structured session). It learns the protocol from <code>orca skills get orchestration</code>, a guide compiled into the binary so it always matches the CLI version. It binds one Run with <code>run-create</code>. Only the coordinator bound to a Task's Run may <code>worker-start</code>. Orca does not decompose work for it: AI decomposition is marked as a future phase.",
+      plain: "The manager is just another AI agent. It reads a how-to guide that ships inside Orca, splits the work into jobs and writes the job descriptions. Orca does not split the work itself.",
+      src: ["src/cli/bundled-skill-guides.ts:96-161", "src/cli/handlers/skill-guide-get.ts", "src/main/runtime/rpc/methods/orchestration/worker/workers.ts:33-44", "src/main/runtime/orchestration/coordinator.ts:146"] },
+    { t: "orca CLI", s: "Carries each request, with caller evidence", owns: ["transport", "caller identity", "retry identity"],
+      tech: "30 orchestration subcommands. It attaches <code>ORCA_TERMINAL_HANDLE</code>, <code>ORCA_PANE_KEY</code> and <code>ORCA_AGENT_LAUNCH_TOKEN</code> as caller evidence, plus a request ID for idempotent retries (<code>--retry-request</code>). After a mutation like <code>worker_done</code>, it re-reads the Dispatch and Task to confirm settlement. If they do not confirm, it reports <code>operation_unknown</code>.",
+      plain: "The <code>orca</code> program is the messenger. It adds the terminal's name tag and a receipt number to every request, so a repeated request is recognised. After important requests it checks that the change really happened.",
+      src: ["src/cli/handlers/orchestration.ts:19-34", "src/shared/orchestration-compatibility-evidence.ts:52-68", "src/cli/handlers/orchestration-worker-settlement.ts:4-49"] },
+    { t: "Orca runtime", s: "Checks authority, applies state machines, places workers", owns: ["authority checks", "placement", "readiness", "mail delivery"],
+      tech: "<code>OrcaRuntimeService</code> in Electron main (or <code>orcad</code>). It verifies that the caller's token hash matches a live PTY, enforces the contract fence, runs each mutation once through <code>mutation_receipts</code>, places worker terminals, waits for readiness, mints capabilities and pushes mailbox pointers. The retired background coordinator loop is fenced off.",
+      plain: "The Orca app is the office that enforces the rules. It checks that each request comes from who it claims, opens worker terminals, waits until each worker is ready, and delivers notes.",
+      src: ["src/main/runtime/orca-runtime-verify-orchestration-compatibility-caller.ts:16-89", "src/main/runtime/rpc/orchestration-contract-fence.ts:11-36", "src/main/runtime/rpc/methods/orchestration/worker/local-worker-start.ts:55-261"] },
+    { t: "Durable state", s: "orchestration.db, the source of truth", owns: ["Runs", "Tasks", "Dispatches", "Messages", "Deliveries", "Gates"],
+      tech: "One SQLite file, schema version 42. Lifecycle authority is whatever the active Dispatch row says. Transitions are checked in <code>lifecycle-transition.ts</code>, and terminal Dispatch and worker states have no outgoing edges. Agent status (working/idle) is a separate store owned by the hook server.",
+      plain: "The ledger is the only truth about who owns which job. A visible window or a copied number does not count. Whether an agent is busy right now is tracked in a different list.",
+      src: ["src/main/runtime/orchestration/db/lifecycle-transition.ts:61-98", "src/main/runtime/orchestration/types.ts:21-23", "docs/reference/agent-status-store.md:45-51"] },
+    { t: "Worker agents", s: "Do one Task each, report through the preamble", owns: ["the code change", "heartbeat", "ask", "worker_done"],
+      tech: "Each worker gets a preamble with its Task ID, Dispatch ID, coordinator handle and a <code>dcap_…</code> Dispatch capability. Only the hash of the capability is stored. Workers send <code>heartbeat</code>, <code>ask</code>, <code>escalation</code> and exactly one <code>worker_done --outcome succeeded|failed</code>, copying the preamble's exact flags. <code>consumer_fenced</code> tells a worker it has been replaced.",
+      plain: "Each worker gets an instruction sheet with its job number and a one-time pass. It uses the pass to send \"still alive\", \"I have a question\" and finally \"done\" or \"failed\". The pass stops working once the job is closed.",
+      src: ["src/main/runtime/rpc/methods/orchestration/worker/deliver-worker-dispatch-preamble.ts:19-63", "src/main/runtime/orchestration/db/dispatch-context/dispatch-capability.ts:7-48", "skill-guides/orchestration/references/worker-contract.md"] },
+    { t: "Workspaces and hosts", s: "Worktree or folder, on local, WSL, SSH or a paired runtime", owns: ["processes", "files", "transcripts", "liveness facts"],
+      tech: "<code>--worktree current</code> (default), an exact workspace, <code>new-child</code> or <code>new-top-level</code>. A fresh worker means a fresh terminal, not necessarily a new worktree. The execution host owns process, filesystem, transcript, stop and cleanup facts. Orchestration never deletes a worktree.",
+      plain: "Workers do their job inside a project folder, which may be on your Mac or on another computer. A new worker gets a new terminal, but it can share a folder. Only the computer where the folder lives can say what is really happening there.",
+      src: ["src/main/runtime/rpc/methods/orchestration/worker/worker-start-agent-placement.ts:78-181", "skill-guides/orchestration/references/placement-and-remote.md:6-44", "docs/reference/ssh-execution-boundary.md:7-14"] }
+  ];
+  function drawRoles() {
+    var box = document.getElementById("layers"), panel = document.getElementById("layerPanel");
+    ROLES.forEach(function (r, i) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "layer"; b.setAttribute("aria-pressed", "false");
+      b.innerHTML = '<span class="idx">L' + (i + 1) + "</span><span><b>" + r.t + '</b><span class="s">' + r.s + "</span></span>";
+      b.addEventListener("click", function () { pick(i); });
+      box.appendChild(b);
+    });
+    function pick(i) {
+      var r = ROLES[i];
+      box.querySelectorAll(".layer").forEach(function (b, j) { b.setAttribute("aria-pressed", String(i === j)); });
+      panel.innerHTML = "<h3>L" + (i + 1) + " · " + r.t + '</h3><div class="owns">' + r.owns.map(function (o) { return '<span class="chip info">' + o + "</span>"; }).join("") + "</div>" + twoLayer(r.tech, r.plain) + srcs(r.src);
+    }
+    pick(1);
+  }
+
+  /* ---------- 03 vocab ---------- */
+  var VOCAB = [
+    { t: "Run", tbl: "runs", d: "A namespace plus the coordinator's inbox. Bound to one coordinator terminal. A rebind bumps <code>consumer_generation</code> and fences the old consumer.", st: [] , src: "db/runs/run-binding.ts:156-176" },
+    { t: "Task", tbl: "tasks", d: "The unit of work in the DAG: spec, deps, result, parent.", st: [["pending","idle"],["ready","info"],["dispatched","warn"],["completed","ok"],["failed","bad"],["blocked","line"]], src: "types.ts:21" },
+    { t: "Dispatch (attempt)", tbl: "dispatch_contexts", d: "One authoritative try at a Task: assignee pane, process incarnation, capability hash, failure count, depth, last heartbeat.", st: [["pending","idle"],["dispatched","warn"],["completed","ok"],["failed","bad"],["circuit_broken","bad"]], src: "types.ts:23" },
+    { t: "Supervised worker", tbl: "worker_dispatches + worker_terminal_resources", d: "The process side of an attempt. A free-text stage tracks progress (accepted, worktree_creating, terminal_readying, agent_readiness, injected, settled, released…).", st: [["starting","idle"],["ready","info"],["start_unknown","line"],["succeeded","ok"],["failed","bad"],["stopping","warn"],["stop_unknown","line"],["stopped","idle"],["abandoned","idle"]], src: "types.ts:142-151" },
+    { t: "Message", tbl: "messages", d: "A durable row with a type and priority (normal, high, urgent).", st: [["status","line"],["dispatch","line"],["worker_done","ok"],["merge_ready","line"],["escalation","warn"],["handoff","line"],["decision_gate","line"],["question","info"],["heartbeat","idle"]], src: "types.ts:3-13" },
+    { t: "Delivery", tbl: "deliveries", d: "One FIFO batch (≤50 messages) handed to a consuming check. It replays until acked. One may be outstanding per mailbox.", st: [["outstanding","warn"],["acknowledged","ok"],["fenced","idle"]], src: "types.ts:60" },
+    { t: "Question", tbl: "question_threads", d: "A blocking <code>ask</code>. Closed automatically when its Dispatch settles or fails.", st: [["pending","warn"],["answered","ok"],["closed","idle"]], src: "types.ts:113" },
+    { t: "Decision gate", tbl: "decision_gates", d: "A coordinator-owned decision that blocks a Task until <code>gate-resolve</code>.", st: [["pending","warn"],["resolved","ok"],["timeout","line"]], src: "types.ts:40" }
+  ];
+  function drawVocab() {
+    var g = document.getElementById("vocabGrid");
+    g.innerHTML = VOCAB.map(function (v) {
+      return '<div class="term"><h3>' + v.t + '</h3><span class="tbl">table: ' + v.tbl + "</span><p>" + v.d + '</p><div class="states">' +
+        v.st.map(function (s) { return '<span class="chip ' + s[1] + '">' + s[0] + "</span>"; }).join("") +
+        '</div><span class="src">src/main/runtime/orchestration/' + v.src + "</span></div>";
+    }).join("");
+  }
+
+  /* ---------- 04 sequence ---------- */
+  var LANES = [ { id: "H", t: "Human" }, { id: "C", t: "Coordinator" }, { id: "R", t: "Orca runtime + DB" }, { id: "W", t: "Worker agent" }, { id: "S", t: "Workspace / host" } ];
+  var STEPS = [
+    { f: "H", to: "C", l: "\"supervise this\"", t: "You ask for supervised work",
+      tech: "The agent classifies its role. Only an explicit request to supervise, monitor or coordinate a DAG makes it a coordinator. A plain handoff goes through <code>orca-cli</code> and creates no Run.",
+      plain: "You ask an agent to manage other agents and wait for results. That request is what turns it into the manager.", src: ["skill-guides/orchestration.md:33-44"] },
+    { f: "C", to: "R", l: "skills get orchestration", back: "version-matched guide", t: "Coordinator loads the protocol",
+      cmd: "orca skills get orchestration", tech: "The installed skill is a stub. The real guide is compiled into the CLI binary, so it always matches the commands it describes. Conditional references load on demand with <code>--reference</code>.",
+      plain: "The manager reads the instruction manual that ships inside Orca itself, so the manual always matches the installed version.", src: ["skills/orchestration/SKILL.md:13-66", "src/cli/bundled-skill-guides.ts:96-161"] },
+    { f: "C", to: "R", l: "run-create", db: ["runs"], t: "Bind a Run",
+      cmd: "orca orchestration run-create --objective \"…\" --json", tech: "Creates a <code>runs</code> row and binds the calling terminal (handle, pane key, session) as coordinator. Later calls are scoped by <code>resolveRunScope</code>. A mismatched caller gets <code>run_required</code>, <code>stable_pane_required</code> or <code>consumer_fenced</code>.",
+      plain: "The manager opens a folder for this piece of work. Orca records that this exact terminal is the manager. Another terminal cannot act as manager for this folder.", src: ["src/cli/handlers/orchestration/run-handlers.ts:17", "src/main/runtime/rpc/methods/orchestration/runs/run-scope.ts:120-176"] },
+    { f: "C", to: "R", l: "task-create --deps", db: ["tasks"], t: "Create Tasks (optional)",
+      cmd: "orca orchestration task-create --spec \"…\" --deps '[\"task_a\"]' --json", tech: "Needed only for planned fan-out with dependencies, or for retries. The Task is inserted as <code>ready</code> if every dependency is completed, otherwise as <code>pending</code>. For a single independent job, <code>worker-start --spec</code> creates the Task in the same call.",
+      plain: "If some jobs must wait for others, the manager lists them first, with what each one waits for. Simple jobs skip this step.", src: ["src/main/runtime/orchestration/db/tasks/task-store.ts:48-66", "skill-guides/orchestration.md:110-114"] },
+    { f: "C", to: "R", l: "worker-start", db: ["worker_dispatches", "dispatch_contexts"], t: "Start a supervised worker",
+      cmd: "orca orchestration worker-start --spec \"…\" --worktree current --agent codex --json", tech: "Checks that the caller is the bound coordinator and that the spec fits the prompt budget (else <code>worker_prompt_too_large</code>, with no side effects). It then picks PTY or structured mode from settings and writes a <code>starting</code> worker row at stage <code>accepted</code>. <code>--on</code> routes to the federated path instead.",
+      plain: "The manager asks for a worker. Orca checks the manager's identity and that the job description is not too long, then writes \"worker starting\" in the ledger.", src: ["src/main/runtime/rpc/methods/orchestration/worker/workers.ts:19-82", "src/main/runtime/rpc/methods/orchestration/worker/local-worker-start.ts:108-128", "src/shared/orchestration-worker-start-prompt-budget.ts:12-28"] },
+    { f: "R", to: "S", l: "place: current / new worktree", t: "Placement",
+      tech: "<code>current</code> or an exact workspace gets a fresh terminal titled <code>worker-&lt;taskId&gt;</code>. <code>new-child</code> and <code>new-top-level</code> create a worktree agent-first, so the startup terminal becomes the worker and setup runs by default. <code>--terminal</code> reuses an existing agent terminal.",
+      plain: "Orca decides where the worker sits: in the same project folder with a new terminal, or in a fresh copy of the project. A new copy is made only when sharing would cause conflicts.", src: ["src/main/runtime/rpc/methods/orchestration/worker/worker-start-agent-placement.ts:78-181", "src/main/runtime/rpc/methods/orchestration/worker/worker-topology.ts:59-109"] },
+    { f: "R", to: "W", l: "spawn agent · wait tui-idle", t: "Launch and readiness",
+      tech: "The agent process starts in a PTY with identity variables. A PTY worker waits for <code>tui-idle</code>, judged by evidence in this order: a positive marker, then a status veto, then sustained absence. A structured worker waits only on the setup gate. If the start is not observed, the outcome is <code>outcome_unknown</code>, not failure.",
+      plain: "Orca starts the AI tool and waits until it is ready for input, so the instructions are not typed into a half-loaded program. If Orca cannot tell whether it started, it says \"unknown\" instead of guessing.", src: ["src/main/runtime/rpc/methods/orchestration/worker/local-worker-start.ts:184-194", "src/main/runtime/tui-idle-evidence.ts:9-31", "src/main/runtime/rpc/methods/orchestration/worker/worker-start-readiness-settlement.ts:91-130"] },
+    { f: "R", to: "W", l: "mint dcap_ · inject preamble", db: ["dispatch_contexts"], t: "Authority and preamble",
+      tech: "Mints a <code>dcap_…</code> capability bound to the pane and process incarnation, and stores only its hash. Then it injects the preamble (Task ID, Dispatch ID, spec, coordinator handle, capability, and whether sub-dispatch is allowed at this depth). The Dispatch is now <code>dispatched</code> and the Task too.",
+      plain: "Orca hands the worker a one-time pass and its instruction sheet. Orca keeps only a fingerprint of the pass, so even the ledger cannot leak it.", src: ["src/main/runtime/orchestration/db/dispatch-context/dispatch-capability.ts:7-48", "src/main/runtime/rpc/methods/orchestration/worker/deliver-worker-dispatch-preamble.ts:19-63", "src/main/runtime/orchestration/preamble.ts:51"] },
+    { f: "C", to: "R", l: "check --wait (parks)", t: "Coordinator waits",
+      cmd: "orca orchestration check --wait --types \"worker_done,escalation,question\" --timeout-ms 900000 --json", tech: "A long-poll on the Run mailbox. The in-memory waiter wakes when a matching message type arrives. An empty result or a timeout is a checkpoint, not a failure. After three empty waits, the guide says to enumerate with <code>worker-list --include-remote</code>.",
+      plain: "The manager sits and waits for news. Waking up with no news is normal. It just waits again, and after three quiet waits it takes a roll call.", src: ["src/main/runtime/runtime-message-waiters.ts:13-143", "src/main/runtime/runtime-rpc/runtime-rpc-long-poll.ts:3-6", "skill-guides/orchestration.md:115-143"] },
+    { f: "W", to: "R", l: "send --type heartbeat", db: ["dispatch_contexts"], t: "Worker heartbeat",
+      tech: "Updates <code>last_heartbeat_at</code> for a <code>dispatched</code> attempt. It proves liveness, never completion. Nothing in the live path fails a worker for a stale heartbeat.",
+      plain: "The worker says \"still here\" from time to time. That shows it is alive. It does not show it is finished.", src: ["src/main/runtime/orchestration/db/dispatch-context/dispatch-completion.ts:87-93", "skill-guides/orchestration/references/worker-contract.md:7-17"] },
+    { f: "W", to: "R", l: "ask (blocks)", back: "wakes coordinator", db: ["question_threads", "messages"], t: "Worker asks a question",
+      cmd: "orca orchestration ask --from <handle> --dispatch-capability <dcap> --question \"…\" --options \"a,b\"", tech: "Creates a pending question and blocks on <code>dispatch:&lt;id&gt;</code> (default 600 s). The message lands in the Run inbox and wakes the coordinator's waiter. If the worker times out, it resumes the same message ID.",
+      plain: "The worker is stuck and asks the manager. It pauses until the answer arrives. If it gives up waiting, it asks the same question again later, never a new copy.", src: ["src/main/runtime/rpc/methods/orchestration/messaging/ask-methods.ts:106-175", "src/shared/orchestration-ask-timeout.ts"] },
+    { f: "C", to: "R", l: "reply --id", back: "answer unblocks ask", db: ["question_threads"], t: "Coordinator replies",
+      cmd: "orca orchestration reply --id <message_id> --body \"…\" --json", tech: "<code>answerQuestion</code> marks the thread answered. The worker's blocked <code>ask</code> returns with the answer.",
+      plain: "The manager answers, and the worker carries on.", src: ["src/main/runtime/orchestration/db/questions/question-threads.ts:73"] },
+    { f: "C", to: "R", l: "send --to dispatch:<id>", back: "pointer typed in pane", t: "Steering a running worker",
+      cmd: "orca orchestration send --to dispatch:<id> --subject \"Follow-up\" --body \"…\" --json", tech: "Durable enqueue to the attempt mailbox. For <code>dispatch:</code> mailboxes, a pointer is typed only when the agent is settled or idle. The worker reads follow-ups with <code>check --terminal &lt;handle&gt;</code> at checkpoints and once more before <code>worker_done</code>.",
+      plain: "The manager leaves an extra note for the worker. The worker does not get interrupted. It checks its pigeonhole at natural pauses and right before it says \"done\".", src: ["src/main/runtime/orchestration/mailbox-pointer-delivery.ts:54", "skill-guides/orchestration/references/worker-contract.md:33-51"] },
+    { f: "W", to: "R", l: "worker_done --outcome", db: ["dispatch_contexts", "tasks", "worker_dispatches"], t: "Worker reports completion",
+      cmd: "orca orchestration send --from <handle> --dispatch-capability <dcap> --type worker_done --task-id <t> --dispatch-id <d> --outcome succeeded", tech: "Validated: an outcome is required, and the sender's pane must be the assignee's. Failures are rejected with <code>sender_not_assignee</code>, <code>inactive_dispatch</code>, <code>stale_dispatch</code> and similar codes. Settlement then revokes the capability, sets the worker to <code>succeeded</code> or <code>failed</code>, closes questions and promotes dependents. No <code>task-update</code> is needed.",
+      plain: "The worker says \"done\" (or \"failed\"). Orca checks that the right worker sent it for the current try. Then it closes the job, cancels the pass and unlocks any job that was waiting for this one.", src: ["src/main/runtime/orchestration/lifecycle-reconciliation.ts:175-300", "src/main/runtime/orchestration/db/dispatch-context/worker-report-settlement.ts:55-280"] },
+    { f: "R", to: "C", l: "Delivery (FIFO ≤50)", db: ["deliveries"], t: "Coordinator receives the batch",
+      tech: "The waiter wakes. <code>check</code> creates a Delivery holding the oldest unread batch, whatever its types. The coordinator processes every row and validates each <code>worker_done</code> against the expected active Dispatch.",
+      plain: "The manager gets the batch of notes, oldest first, and must read every one, not only the one it was waiting for.", src: ["src/main/runtime/rpc/methods/orchestration/messaging/check-run.ts:131-132", "skill-guides/orchestration/references/messaging-and-gates.md:10-27"] },
+    { f: "C", to: "R", l: "worker-release · check --ack", db: ["worker_terminal_resources", "worker_terminal_archives", "deliveries"], t: "Decide the next owner, then ack",
+      cmd: "orca orchestration worker-release --dispatch <id> --json\norca orchestration check --ack <delivery_id> --wait …", tech: "Before acking, the coordinator decides each settled terminal's next owner: reuse, retain or release. Release is refused for an unsettled worker. Acking marks the Delivery <code>acknowledged</code>, and the next wait can start.",
+      plain: "The manager decides what to do with the finished worker's terminal, then signs for the batch of notes. Only then does it wait for more news.", src: ["src/main/runtime/orchestration/db/worker-terminal/worker-terminal-release.ts:15-75", "skill-guides/orchestration.md:115-129"] },
+    { f: "R", to: "W", l: "archive output · close exact terminal", t: "Release",
+      tech: "Release re-proves the terminal's identity, archives transcript and output tail, then closes only that agent terminal. The worktree, setup terminals and any terminal you typed into are kept. Archived output stays readable through <code>worker-read</code>.",
+      plain: "Orca saves a copy of what the worker wrote, then closes only that worker's terminal. Your project folder and any window you touched stay as they are.", src: ["src/main/runtime/rpc/methods/orchestration/worker/worker-release.ts:16-85", "src/main/runtime/rpc/methods/orchestration/worker/worker-control.ts:80-195"] },
+    { f: "C", to: "H", l: "report per Task", t: "Report back",
+      tech: "The coordinator's turn ends only when <code>worker-list --run &lt;id&gt; --terminal-state reclaimable</code> returns none, and the report names each Task's outcome, evidence and unresolved blockers.",
+      plain: "The manager finishes only when no worker is left without a decision. It then tells you, job by job, what happened and how it knows.", src: ["skill-guides/orchestration.md:18-31", "skill-guides/orchestration.md:171-174"] }
+  ];
+  var seqIdx = 0;
+  function drawSeq() {
+    var svg = document.getElementById("seqSvg");
+    var W = 700, laneX = {}, gap = W / LANES.length, top = 54, row = 38;
+    var H = top + STEPS.length * row + 24;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    var defs = el("defs", {}, svg);
+    [["sa", "var(--idle)"], ["sb", "var(--accent)"]].forEach(function (m) {
+      var mk = el("marker", { id: m[0], viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto" }, defs);
+      el("path", { d: "M0,0 L10,5 L0,10 z", fill: m[1] }, mk);
+    });
+    LANES.forEach(function (l, i) {
+      var x = gap * i + gap / 2; laneX[l.id] = x;
+      el("line", { x1: x, y1: top - 8, x2: x, y2: H - 6, class: "lane-line" }, svg);
+      var g = el("g", { class: "lane-head" }, svg);
+      el("rect", { x: x - gap / 2 + 6, y: 8, width: gap - 12, height: 30, rx: 6 }, g);
+      var t = el("text", { x: x, y: 28, "text-anchor": "middle" }, g); t.textContent = l.t;
+    });
+    STEPS.forEach(function (s, i) {
+      var y = top + 14 + i * row, g = el("g", { class: "arrow", "data-i": i }, svg);
+      var x1 = laneX[s.f], x2 = laneX[s.to], dir = x2 > x1 ? 1 : -1;
+      el("line", { x1: x1, y1: y, x2: x2 - dir * 3, y2: y, class: "hit" }, g);
+      el("line", { x1: x1, y1: y, x2: x2 - dir * 3, y2: y, "marker-end": "url(#sa)", class: "main" }, g);
+      if (s.back) el("line", { x1: x2, y1: y + 9, x2: x1 + dir * 3, y2: y + 9, "stroke-dasharray": "3 3", "marker-end": "url(#sa)", class: "main" }, g);
+      var lab = el("text", { x: (x1 + x2) / 2, y: y - 5, "text-anchor": "middle" }, g); lab.textContent = s.l;
+      var n = el("text", { x: 4, y: y + 4, class: "stepnum" }, g); n.textContent = String(i + 1).padStart(2, "0");
+      g.addEventListener("click", function () { setStep(i); });
+    });
+  }
+  function setStep(i) {
+    seqIdx = Math.max(0, Math.min(STEPS.length - 1, i));
+    var s = STEPS[seqIdx];
+    document.querySelectorAll("#seqSvg .arrow").forEach(function (g) {
+      var k = +g.getAttribute("data-i");
+      g.setAttribute("class", "arrow " + (k === seqIdx ? "active" : k < seqIdx ? "done" : "future"));
+      g.querySelectorAll(".main").forEach(function (l) { l.setAttribute("marker-end", k === seqIdx ? "url(#sb)" : "url(#sa)"); });
+    });
+    document.getElementById("seqCount").textContent = "step " + (seqIdx + 1) + " / " + STEPS.length;
+    document.getElementById("seqBar").style.width = ((seqIdx + 1) / STEPS.length * 100) + "%";
+    document.getElementById("seqPrev").disabled = seqIdx === 0;
+    document.getElementById("seqNext").disabled = seqIdx === STEPS.length - 1;
+    var laneName = function (id) { return LANES.filter(function (l) { return l.id === id; })[0].t; };
+    document.getElementById("stepBody").innerHTML =
+      "<h3>" + (seqIdx + 1) + ". " + s.t + "</h3>" +
+      '<div class="rows"><span class="chip line">' + laneName(s.f) + " → " + laneName(s.to) + "</span>" +
+      (s.db ? s.db.map(function (t) { return '<span class="chip info">' + t + "</span>"; }).join("") : "") + "</div>" +
+      (s.cmd ? '<div class="cmd">' + s.cmd.replace(/</g, "&lt;") + "</div>" : "") +
+      twoLayer(s.tech, s.plain) + srcs(s.src);
+    store("orca-seq-step", String(seqIdx));
+  }
+  function wireSeq() {
+    document.getElementById("seqPrev").addEventListener("click", function () { setStep(seqIdx - 1); });
+    document.getElementById("seqNext").addEventListener("click", function () { setStep(seqIdx + 1); });
+    document.addEventListener("keydown", function (e) {
+      var r = document.getElementById("lifecycle").getBoundingClientRect();
+      if (r.top > window.innerHeight * 0.6 || r.bottom < 120) return;
+      if (e.target.closest && e.target.closest("input,textarea")) return;
+      if (e.key === "ArrowRight") { setStep(seqIdx + 1); e.preventDefault(); }
+      if (e.key === "ArrowLeft") { setStep(seqIdx - 1); e.preventDefault(); }
+    });
+    var saved = parseInt(store("orca-seq-step"), 10);
+    setStep(isNaN(saved) ? 0 : saved);
+  }
+
+  /* ---------- 05 mailbox ---------- */
+  var PIPE = [
+    { k: "1 · send", h: "Durable enqueue", p: "A <code>messages</code> row is committed. <code>send</code> returns success here, and that proves only the enqueue.", modes: ["wait", "busy"] },
+    { k: "2a · waiter", h: "Long-poll wakes", p: "A parked <code>check --wait</code> with a matching type filter is woken at once. Default wait is 2 min, capped by the caller's timeout.", modes: ["wait"] },
+    { k: "2b · pointer", h: "Typed into the pane", p: "\"You have N orchestration messages. Run <code>orca orchestration check</code>.\" Enter follows 500 ms later. For <code>run:</code> and <code>dispatch:</code> mailboxes this waits until the agent is idle. Cursor Agent panes are skipped.", modes: ["busy"] },
+    { k: "3 · check", h: "Delivery handed over", p: "The oldest unread batch (≤50) becomes one <code>outstanding</code> Delivery. It replays until acked. <code>--peek</code> and <code>--all</code> are read-only.", modes: ["wait", "busy"] },
+    { k: "4 · --ack", h: "Acknowledged", p: "The coordinator acks only after processing every row and deciding each settled terminal's owner. The next batch can then form.", modes: ["wait", "busy"] }
+  ];
+  function drawPipe(mode) {
+    var shown = PIPE.filter(function (s) { return s.modes.indexOf(mode) >= 0; });
+    document.getElementById("pipe").innerHTML = shown.map(function (s, i) {
+      return '<div class="stage' + (i === 1 ? " hot" : "") + '"><span class="k">' + s.k + "</span><h3>" + s.h + "</h3><p>" + s.p + "</p></div>";
+    }).join("");
+    document.getElementById("pipeNote").innerHTML = mode === "wait"
+      ? "Waiter path: the coordinator is blocked in <code>check --wait</code>, so Orca wakes it in memory and types nothing into its terminal."
+      : "Pointer path: nobody is waiting, so Orca nudges the terminal. The nudge is best effort. It does not prove the agent read the message.";
+    document.querySelectorAll("#mail .toggle button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-mode") === mode)); });
+  }
+
+  /* ---------- 06 DAG ---------- */
+  var DAG0 = [
+    { id: "T1", n: "DB migration", deps: [], x: 20, y: 24 },
+    { id: "T2", n: "API endpoint", deps: [], x: 20, y: 128 },
+    { id: "T3", n: "UI form", deps: [], x: 20, y: 232 },
+    { id: "T4", n: "Integration tests", deps: ["T1", "T2"], x: 300, y: 76 },
+    { id: "T5", n: "Docs + release note", deps: ["T3", "T4"], x: 580, y: 154 }
+  ];
+  var dag, dlog, NW = 180, NH = 74;
+  var STC = { pending: "idle", ready: "info", dispatched: "warn", completed: "ok", failed: "bad" };
+  function dagReset() {
+    dag = DAG0.map(function (t) { return { id: t.id, n: t.n, deps: t.deps, x: t.x, y: t.y, status: t.deps.length ? "pending" : "ready", fails: 0, attempt: 0 }; });
+    dlog = [];
+    log("task-create ×5 → T1, T2, T3 inserted as ready; T4, T5 as pending");
+    drawDag();
+  }
+  function byId(id) { return dag.filter(function (t) { return t.id === id; })[0]; }
+  function log(s) { dlog.unshift(s); }
+  function promote() {
+    dag.forEach(function (t) {
+      if (t.status === "pending" && t.deps.every(function (d) { return byId(d).status === "completed"; })) {
+        t.status = "ready"; log("promoteReadyTasks: " + t.id + " pending → ready (all deps completed)");
+      }
+    });
+  }
+  function act(id, ok) {
+    var t = byId(id);
+    if (ok) { t.status = "completed"; log("worker_done " + t.id + " --outcome succeeded → Task completed, capability revoked"); promote(); }
+    else {
+      t.fails++;
+      if (t.fails >= 3) { t.status = "failed"; log("worker_done " + t.id + " --outcome failed → failure_count 3 → circuit_broken, Task failed"); }
+      else { t.status = "ready"; log("worker_done " + t.id + " --outcome failed → failure_count " + t.fails + ", Task back to ready (retry with --retry-of)"); }
+    }
+    drawDag();
+  }
+  function wave() {
+    var r = dag.filter(function (t) { return t.status === "ready"; });
+    if (!r.length) { log("no ready Tasks: wait with check --wait for running work to settle"); drawDag(); return; }
+    r.forEach(function (t) { t.status = "dispatched"; t.attempt++; });
+    log("worker-start ×" + r.length + " (" + r.map(function (t) { return t.id; }).join(", ") + ") → parallel Dispatches");
+    drawDag();
+  }
+  function drawDag() {
+    var svg = document.getElementById("dagSvg");
+    svg.innerHTML = "";
+    var defs = el("defs", {}, svg);
+    var mk = el("marker", { id: "da", viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "6", markerHeight: "6", orient: "auto" }, defs);
+    el("path", { d: "M0,0 L10,5 L0,10 z", fill: "var(--idle)" }, mk);
+    dag.forEach(function (t) {
+      t.deps.forEach(function (d) {
+        var s = byId(d), x1 = s.x + NW, y1 = s.y + NH / 2, x2 = t.x - 2, y2 = t.y + NH / 2, mx = (x1 + x2) / 2;
+        el("path", { d: "M" + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2, class: "edge" + (s.status === "completed" ? " met" : ""), "marker-end": "url(#da)" }, svg);
+      });
+    });
+    dag.forEach(function (t) {
+      var c = STC[t.status], g = el("g", { class: "node" }, svg);
+      el("rect", { x: t.x, y: t.y, width: NW, height: NH, rx: 9, class: "box", fill: "var(--" + (c === "info" ? "accent-soft" : c + "-soft") + ")", stroke: "var(--" + (c === "info" ? "accent" : c) + ")" }, g);
+      var a = el("text", { x: t.x + 12, y: t.y + 22, class: "t" }, g); a.textContent = t.id + " · " + t.n;
+      var b = el("text", { x: t.x + 12, y: t.y + 40, class: "s", fill: "var(--" + (c === "info" ? "accent" : c) + ")" }, g);
+      b.textContent = t.status + (t.attempt ? " · attempt " + t.attempt : "") + (t.fails ? " · fails " + t.fails : "");
+      if (t.status === "dispatched") {
+        [["✓ succeeded", true, 12, "ok"], ["✗ failed", false, 104, "bad"]].forEach(function (o) {
+          var bg = el("g", { class: "act", tabindex: "0", role: "button", "aria-label": t.id + " " + o[0] }, g);
+          el("rect", { x: t.x + o[2], y: t.y + 50, width: o[1] ? 86 : 64, height: 18, rx: 4, fill: "var(--surface)", stroke: "var(--" + o[3] + ")" }, bg);
+          var bt = el("text", { x: t.x + o[2] + 7, y: t.y + 63, fill: "var(--" + o[3] + ")" }, bg); bt.textContent = o[0];
+          var fire = function () { act(t.id, o[1]); };
+          bg.addEventListener("click", fire);
+          bg.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fire(); } });
+        });
+      } else if (t.status === "pending") {
+        var w = el("text", { x: t.x + 12, y: t.y + 62, class: "s", fill: "var(--muted)" }, g);
+        w.textContent = "waits for " + t.deps.filter(function (d) { return byId(d).status !== "completed"; }).join(", ");
+      }
+    });
+    document.getElementById("dagLog").innerHTML = dlog.slice(0, 14).map(function (s, i) { return '<div class="' + (i === 0 ? "new" : "") + '">' + s + "</div>"; }).join("");
+  }
+
+  /* ---------- 07 verdicts ---------- */
+  var VERDICTS = [
+    { k: "live", c: "ok", s: "Positive proof the agent is running",
+      yes: ["Keep waiting with check --wait", "Read bounded output with worker-read", "Send follow-ups to dispatch:<id>"], no: ["Release (not settled yet)", "Treat visible activity as completion"],
+      note: "<code>worker-show</code>'s <code>observation.status</code> is PTY liveness only. A live terminal can hold an agent stuck at a trust prompt. The fleet verdict in <code>worker-list</code>'s <code>projection.liveness</code> decides." },
+    { k: "unverifiable", c: "warn", s: "Absence of evidence, for example contact lost",
+      yes: ["Keep waiting", "Inspect: worker-show, worker-read, worker-list --include-remote"], no: ["worker-stop", "worker-abandon", "Retry", "Release"],
+      note: "Reasons include <code>missing_status</code>, <code>stale_status</code>, <code>restored_unconfirmed</code>, <code>host_unavailable</code> and <code>capability_unsupported</code>. Only <code>host_unavailable</code> is real contact loss. A null <code>agentWait</code> or an unchanged output tail is the same absence seen again." },
+    { k: "exited", c: "bad", s: "Positive proof the process ended",
+      yes: ["Enumerate with worker-list and run its literal nextAction", "worker-stop or worker-abandon", "Retry with --retry-of and explicit placement"], no: ["Silently relaunch from memory", "Route around a circuit-broken Task with a new Run"],
+      note: "A transcript whose final agent turn sent no <code>worker_done</code> also counts as positive proof that the agent stopped." },
+    { k: "outcome_unknown", c: "line", s: "The start or the result was not observed",
+      yes: ["Inspect first", "Then choose worker-stop or worker-abandon explicitly", "request-show --request <id> for a lost mutation response"], no: ["Replay a mutation blind", "Count it as a failure for retry"],
+      note: "An <code>unobserved</code> turn start becomes <code>outcome_unknown</code>, not failure. <code>request-show</code> answers <code>completed</code>, <code>pending</code> or <code>absent</code>, and <code>absent</code> is not proof that nothing happened." }
+  ];
+  function drawVerdicts() {
+    var list = document.getElementById("verdictList"), body = document.getElementById("verdictBody");
+    VERDICTS.forEach(function (v, i) {
+      var b = document.createElement("button"); b.type = "button"; b.className = "vbtn"; b.setAttribute("aria-pressed", "false");
+      b.innerHTML = '<span><span class="chip ' + v.c + '">' + v.k + "</span></span><small>" + v.s + "</small>";
+      b.addEventListener("click", function () { pick(i); });
+      list.appendChild(b);
+    });
+    function pick(i) {
+      var v = VERDICTS[i];
+      list.querySelectorAll(".vbtn").forEach(function (b, j) { b.setAttribute("aria-pressed", String(i === j)); });
+      var li = function (a) { return "<ul>" + a.map(function (x) { return "<li>" + x.replace(/</g, "&lt;") + "</li>"; }).join("") + "</ul>"; };
+      body.innerHTML = '<div class="allow"><div class="yes"><h4>Allowed</h4>' + li(v.yes) + '</div><div class="no"><h4>Never on this alone</h4>' + li(v.no) + "</div></div><p class=\"hint\">" + v.note + "</p>" +
+        '<p class="plain"><strong><u>In plain terms:</u></strong> ' + ["Proof that the worker is running means: keep waiting, and you may look at its output.", "\"I can't tell\" never justifies stopping, retrying or closing anything. Keep waiting, or look for real evidence.", "Proof that the worker stopped is the only thing that allows stopping, retrying or giving up on it.", "If Orca does not know whether something happened, it asks the ledger first and does not repeat the command blindly."][i] + "</p>";
+    }
+    pick(1);
+  }
+
+  /* ---------- 09 ledger ---------- */
+  var CAT = { code: ["Enforced in code", "ok"], instr: ["Agent instruction", "info"], legacy: ["Legacy compat", "warn"], retired: ["Retired", "idle"], planned: ["Planned / unwired", "bad"] };
+  var LEDGER = [
+    ["code", "Only the coordinator bound to a Task's Run can <code>worker-start</code>.", "src/main/runtime/rpc/methods/orchestration/worker/workers.ts:33-44"],
+    ["code", "Rebinding a Run bumps <code>consumer_generation</code> and fences the previous consumer.", "src/main/runtime/orchestration/db/runs/run-binding.ts:156-176"],
+    ["code", "Caller identity is proven: the launch-token hash must match a live PTY, then hook attestation.", "src/main/runtime/orca-runtime-verify-orchestration-compatibility-caller.ts:16-89"],
+    ["code", "<code>worker_done</code> needs <code>outcome</code> = succeeded|failed and must come from the assignee's pane.", "src/main/runtime/orchestration/lifecycle-reconciliation.ts:175-300"],
+    ["code", "Release refuses an unsettled worker: \"only a settled worker can release\".", "src/main/runtime/orchestration/db/worker-terminal/worker-terminal-release.ts:43-50"],
+    ["code", "One outstanding Delivery per mailbox, enforced by a SQLite trigger.", "src/main/runtime/orchestration/db/schema/migrate-v41.ts:11-27"],
+    ["code", "Circuit breaker: 3 failed attempts → Dispatch <code>circuit_broken</code>, Task <code>failed</code>.", "src/main/runtime/orchestration/db/dispatch-context/dispatch-circuit-breaker.ts:2"],
+    ["code", "Nested worker depth defaults to 1. A new Run does not reset it.", "src/shared/nested-worker-depth.ts:8"],
+    ["code", "Dispatch capability <code>dcap_…</code> stored only as a hash, revoked at settlement.", "src/main/runtime/orchestration/db/dispatch-context/dispatch-capability.ts:7-48"],
+    ["code", "Mutations are idempotent: <code>mutation_receipts</code> keyed by caller fingerprint and request ID.", "src/main/runtime/rpc/orchestration-mutation-executor.ts:48"],
+    ["code", "A Task is <code>ready</code> only when every dependency is completed and in the same Run. Promotion runs in the completion transaction.", "src/main/runtime/orchestration/db/tasks/task-store.ts:48-66,211-235"],
+    ["code", "An over-budget spec fails with <code>worker_prompt_too_large</code> before any side effect.", "src/shared/orchestration-worker-start-prompt-budget.ts:12-28"],
+    ["code", "Mutations need contract <code>orchestration.contract.v1</code>. Retired methods are fenced.", "src/main/runtime/rpc/orchestration-contract-fence.ts:11-36"],
+    ["instr", "Send heartbeats at the preamble's cadence. Runtime side: only <code>last_heartbeat_at</code> is recorded.", "skill-guides/orchestration/references/worker-contract.md:7-17"],
+    ["instr", "Workers check for follow-ups at checkpoints and once more before <code>worker_done</code>.", "skill-guides/orchestration/references/worker-contract.md:33-51"],
+    ["instr", "<code>worker_done</code> body is three sentences: work, findings, remaining.", "skill-guides/orchestration/references/worker-contract.md:61-72"],
+    ["instr", "After three empty waits, enumerate with <code>worker-list --include-remote</code>.", "skill-guides/orchestration.md:131-143"],
+    ["instr", "Prefer parallel waves over dependency chains deeper than 3–4 steps.", "skill-guides/orchestration.md:110-114"],
+    ["instr", "Every Task spec names Target, Change, Constraints, Ownership and Observable acceptance.", "skill-guides/orchestration.md:149-157"],
+    ["instr", "Never stop, abandon, retry or release on <code>unverifiable</code>. (The verdict type exists in code. The policy lives in the guide.)", "skill-guides/orchestration/references/recovery-and-cleanup.md:52-63"],
+    ["instr", "A review-only <code>worker_done</code> does not authorize the coordinator to edit files.", "skill-guides/orchestration/references/coordinator-loop.md:57-62"],
+    ["retired", "<code>coordinator-start</code> / <code>coordinator-stop</code> (aliases <code>run</code>, <code>run-stop</code>) throw <code>orchestration_migration_required</code>.", "src/cli/handlers/orchestration/dispatch-handlers.ts:69-83"],
+    ["retired", "RPC <code>orchestration.run</code> / <code>runStop</code> are fenced as retired methods.", "src/shared/orchestration-rpc-contract.ts:45-49"],
+    ["retired", "The background Coordinator loop (max 4 concurrent, 10-minute hung-worker warning) still exists but cannot be reached.", "src/main/runtime/orchestration/coordinator.ts:36 · coordinator-task-dispatch.ts:16-27"],
+    ["legacy", "Authority labels: [LEGACY COMPATIBILITY], [LEGACY RECOVERY REPLAY — MAY HAVE BEEN SEEN], [LEGACY READ-ONLY].", "skill-guides/orchestration/references/legacy-contract-migration.md:7-17"],
+    ["legacy", "<code>run_legacy_local</code> is an audit tombstone. <code>run-use --takeover-legacy</code> fences the old coordinator and keeps workers.", "skill-guides/orchestration/references/legacy-contract-migration.md:54-83"],
+    ["legacy", "<code>legacy_*</code> tables and <code>delivery_contract = legacy_direct</code>. Legacy direct mail is inspect-only.", "src/main/runtime/orchestration/db/schema/migrate-legacy-contract-storage.ts:30-74"],
+    ["legacy", "Attested <code>worker_server_legacy</code> settlements from older federated peers are accepted. Unattested ones are rejected.", "src/cli/handlers/orchestration-worker-settlement.ts:121-127"],
+    ["planned", "AI task decomposition: \"decomposition isn't implemented yet … a future phase\".", "src/main/runtime/orchestration/coordinator.ts:146"],
+    ["planned", "Gate status <code>timeout</code> exists, but <code>timeoutGate</code> has no non-test caller. Gates resolve only through <code>gate-resolve</code>.", "src/main/runtime/orchestration/db/decision-gates/decision-gate-store.ts:129"],
+    ["planned", "Structured-session callers: the server path exists, but no CLI producer of <code>agentSessionId</code> was found (unverified, one search).", "src/main/runtime/rpc/orchestration-session-caller.ts"],
+    ["planned", "Agent-status store: renderer-subscriber (PR 2) and shared-rollup (PR 3) steps superseded by the PR 2A boundary.", "docs/reference/agent-status-store.md:5-17"]
+  ];
+  var ledgerFilter = "all";
+  function drawLedger() {
+    var f = document.getElementById("filters");
+    var keys = ["all"].concat(Object.keys(CAT));
+    f.innerHTML = keys.map(function (k) {
+      var n = k === "all" ? LEDGER.length : LEDGER.filter(function (r) { return r[0] === k; }).length;
+      return '<button type="button" data-k="' + k + '" aria-pressed="' + (k === ledgerFilter) + '">' + (k === "all" ? "All" : CAT[k][0]) + '<span class="n">' + n + "</span></button>";
+    }).join("");
+    f.querySelectorAll("button").forEach(function (b) { b.addEventListener("click", function () { ledgerFilter = b.getAttribute("data-k"); store("orca-ledger", ledgerFilter); drawLedger(); }); });
+    document.getElementById("ledgerBody").innerHTML = LEDGER.filter(function (r) { return ledgerFilter === "all" || r[0] === ledgerFilter; }).map(function (r) {
+      var doc = /^(docs|skill-guides)/.test(r[2]);
+      return '<tr><td><span class="chip ' + CAT[r[0]][1] + '">' + CAT[r[0]][0] + "</span></td><td>" + r[1] + '</td><td><span class="src' + (doc ? " doc" : "") + '">' + r[2] + "</span></td></tr>";
+    }).join("");
+  }
+
+  /* ---------- rail highlight ---------- */
+  function wireRail() {
+    var links = Array.prototype.slice.call(document.querySelectorAll(".rail a"));
+    if (!("IntersectionObserver" in window)) return;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) links.forEach(function (a) { a.classList.toggle("on", a.getAttribute("href") === "#" + e.target.id); });
+      });
+    }, { rootMargin: "-20% 0px -70% 0px" });
+    document.querySelectorAll("main section").forEach(function (s) { io.observe(s); });
+  }
+
+  drawProc();
+  drawRoles();
+  drawVocab();
+  drawSeq(); wireSeq();
+  drawPipe("wait");
+  document.querySelectorAll("#mail .toggle button").forEach(function (b) { b.addEventListener("click", function () { drawPipe(b.getAttribute("data-mode")); }); });
+  dagReset();
+  document.getElementById("dagWave").addEventListener("click", wave);
+  document.getElementById("dagReset").addEventListener("click", dagReset);
+  drawVerdicts();
+  var lf = store("orca-ledger"); if (lf && (lf === "all" || CAT[lf])) ledgerFilter = lf;
+  drawLedger();
+  wireRail();
+})();
+</script>
+</body>
+</html>

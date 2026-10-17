@@ -1,0 +1,37 @@
+Built-in image generation tool.
+
+Use case: infographic-diagram.
+Create a polished, editorial, English infographic of Block's article, for an information systems professor. Portrait 3:4 layout, high resolution, exceptionally crisp readable typography. Restrained monochrome: white canvas, near-black typography, pale neutral gray panels, thin gray rules. Swiss design / Geist-like sans serif. Lots of whitespace, clear typographic hierarchy, simple intelligent line diagrams, no decorative photos, no gradients, no logos. Text is paraphrased summary, not quotations. Render ALL supplied wording accurately. Do not add claims or statistics. This is Block's proposed operating model, not proven results.
+
+Title: "FROM HIERARCHY TO INTELLIGENCE"
+Subtitle: "Block's proposed operating model"
+Byline: "Jack Dorsey & Roelof Botha • 31 March 2026"
+
+Section 01: "THE COORDINATION SHIFT"
+Large side-by-side diagrams: left a pyramid / org chart whose upward and downward arrows go through three management levels, labeled "HIERARCHY" and "People relay context through layers". Right a network with a central dark node labeled "Shared AI system" surrounded by human specialist nodes labeled collectively "People at the edge", with direct bidirectional links, labeled "INTELLIGENCE" and "Shared context enables direct action". Arrow between the diagrams indicates transition.
+One prominent takeaway below: "AI coordinates. People build, own outcomes, and exercise judgment."
+
+Section 02: "FOUR SYSTEM LAYERS"
+Four neat numbered horizontal bands, stacked, each with a small line icon and precise copy:
+"1  CAPABILITIES" / "Reusable financial building blocks"
+"2  WORLD MODEL" / "Company operations + customer transaction context"
+"3  INTELLIGENCE" / "Compose timely, personalized solutions"
+"4  INTERFACES" / "Deliver through Square, Cash App, and other surfaces"
+Connect the layers visually as an architecture; intelligence uses capabilities and context, interfaces deliver.
+
+Section 03: "THREE HUMAN ROLES"
+Three equal columns, clear distinct small icons:
+"BUILD" / "Individual contributors" / "Build and operate the system"
+"OWN OUTCOMES" / "Directly Responsible Individuals" / "Lead cross-team problems"
+"DEVELOP PEOPLE" / "Player-coaches" / "Build while coaching others"
+
+Section 04: "THE COMPOUNDING LOOP"
+A simple loop with arrows: "Richer signals" → "Better models" → "Better solutions" → "More transactions" → back to "Richer signals".
+Small line: "Missing capabilities become the next backlog."
+
+Bottom note in clearly readable restrained panel:
+"HUMAN JUDGMENT REMAINS ESSENTIAL"
+"Ethics, trust, novel situations, and high-stakes decisions."
+"Status: early-stage transition; outcomes remain unproven."
+Footer: "Source: block.xyz/inside/from-hierarchy-to-intelligence"
+All content should fit spaciously, no cropped edges, no tiny illegible text.

@@ -1,0 +1,180 @@
+<div id="orca-orchestration-xu">
+  <style>
+    #orca-orchestration-xu .orca-diagram { display:block; width:100%; overflow:visible; }
+    #orca-orchestration-xu .orca-diagram text { font-family:inherit; fill:var(--foreground); font-weight:400; }
+    #orca-orchestration-xu .orca-diagram .orca-mark { fill:var(--background); stroke:var(--border); stroke-width:1; }
+    #orca-orchestration-xu .orca-diagram .orca-edge { fill:none; stroke:var(--muted-foreground); stroke-width:1.2; }
+    #orca-orchestration-xu .orca-diagram .orca-selected .orca-mark { fill:var(--primary); stroke:var(--primary); }
+    #orca-orchestration-xu .orca-diagram .orca-selected text { fill:var(--primary-foreground); }
+    #orca-orchestration-xu .orca-detail { display:grid; gap:8px; }
+    #orca-orchestration-xu .orca-source { overflow-wrap:anywhere; }
+  </style>
+  <h3>Orca: who decides, what persists, where work runs</h3>
+  <div class="viz-controls">
+    <label class="form-label" for="orca-view">View
+      <select class="form-select" id="orca-view">
+        <option value="system">System architecture</option>
+        <option value="lifecycle">Tasks, attempts, and messages</option>
+        <option value="hosts">Local, SSH, and paired runtimes</option>
+      </select>
+    </label>
+    <label class="form-label" for="orca-component">Inspect
+      <select class="form-select" id="orca-component"></select>
+    </label>
+  </div>
+  <svg class="orca-diagram" role="img" aria-labelledby="orca-diagram-title orca-diagram-desc"></svg>
+  <div class="card orca-detail" aria-live="polite">
+    <span id="orca-detail"></span>
+    <span class="text-small orca-source">Implementation: <code id="orca-source"></code></span>
+  </div>
+  <div class="text-small text-muted">Testing-Orca · da6d483ab9 · source-derived schematic · arrows show coordination and data flow</div>
+  <script>
+    (() => {
+      const root = document.getElementById('orca-orchestration-xu');
+      const viewSelect = root.querySelector('#orca-view');
+      const componentSelect = root.querySelector('#orca-component');
+      const svg = root.querySelector('.orca-diagram');
+      const detail = root.querySelector('#orca-detail');
+      const source = root.querySelector('#orca-source');
+      const runtime = 'src/main/runtime/';
+      const rpc = runtime + 'rpc/methods/orchestration/';
+      const db = runtime + 'orchestration/db/';
+      const views = {
+        system: {
+          title:'A coordinator agent directs an Orca runtime', rows:6,
+          description:'The human supplies a goal. The coordinator agent calls the Orca CLI and RPC runtime. The runtime persists coordination in SQLite and launches workers in their execution environments. Workers exchange durable messages, edit files, and publish status to UI subscribers.',
+          nodes:[
+            {id:'goal',x:.5,r:0,title:'Human goal',sub:'scope + acceptance',what:'Human: defines the goal and keeps approval authority; a supervised Run binds an objective to its coordinator.',file:rpc+'runs/runs.ts'},
+            {id:'coordinator',x:.25,r:1,title:'Coordinator agent',sub:'plans + verifies',what:'Coordinator: decomposes work, chooses parallel waves, answers questions, and validates results. A Run does not itself schedule workers; the old automatic coordinator command is retired.',file:'src/cli/handlers/orchestration/dispatch-handlers.ts'},
+            {id:'ui',x:.75,r:1,title:'Desktop / phone',sub:'view + control',what:'Interfaces: display workspaces, agent sessions, and status. Readers subscribe to the execution host’s status store; presentation policy stays in the readers.',file:'docs/reference/agent-status-store.md'},
+            {id:'cli',x:.25,r:2,title:'orca CLI → RPC',sub:'typed operations',what:'CLI: resolves the caller and translates commands into runtime RPC operations such as orchestration.dispatch. Mutation requests carry durable retry identity.',file:'src/cli/handlers/orchestration/dispatch-handlers.ts'},
+            {id:'runtime',x:.75,r:2,title:'Orca runtime',sub:'validate + route',what:'Runtime: binds Runs to live callers, validates requests, routes mail, and owns worker lifecycle operations. It is coordination machinery; the agent supplies the plan.',file:rpc+'runs/runs.ts'},
+            {id:'sqlite',x:.25,r:3,title:'SQLite · WAL',sub:'coordination state',what:'Persistence: orchestration.db stores Runs, Tasks, Dispatches, mail, Deliveries, and mutation receipts. SQLite uses WAL; this state is separate from provider chat transcripts.',file:runtime+'orchestration/db/orchestration-db.ts'},
+            {id:'launcher',x:.75,r:3,title:'Worker launcher',sub:'placement + readiness',what:'Launcher: selects an existing workspace or creates a worktree, starts an agent session or terminal, waits for readiness, and delivers the Task’s dispatch preamble.',file:rpc+'worker/local-worker-start.ts'},
+            {id:'mailbox',x:.25,r:4,title:'Durable mailboxes',sub:'send · check · ack',what:'Mailbox: questions, replies, heartbeats, and outcome reports persist. Delivery batches replay until acknowledged. A timed-out ask can resume the same question; a wake-up does not prove the recipient read the message.',file:rpc+'messaging/check-run.ts'},
+            {id:'workers',x:.75,r:4,title:'Worker agents',sub:'PTY / structured',what:'Workers: Codex, Claude, or another supported provider executes the Task. PTY workers receive a terminal prompt; structured workers receive a provider-acknowledged turn. Both get the same preamble.',file:rpc+'worker/deliver-worker-dispatch-preamble.ts'},
+            {id:'status',x:.25,r:5,title:'Agent status store',sub:'host-owned evidence',what:'Status: hooks, relay evidence, and structured-session summaries converge in the canonical host-owned store. A heartbeat proves liveness; it does not settle a Task.',file:'docs/reference/agent-status-store.md'},
+            {id:'files',x:.75,r:5,title:'Workspace files',sub:'worktree / folder',what:'Work: agents operate on the selected execution host’s files and tools. Separate worktrees can isolate edits; workers can also share a workspace, so edit ownership must be explicit.',file:rpc+'worker/local-worker-start.ts'}
+          ],
+          edges:[['goal','coordinator'],['goal','ui'],['coordinator','cli'],['ui','runtime'],['cli','runtime'],['runtime','sqlite'],['runtime','launcher'],['sqlite','mailbox'],['launcher','workers'],['workers','mailbox'],['mailbox','coordinator'],['workers','status'],['workers','files']]
+        },
+        lifecycle: {
+          title:'One Task can have several attempts; only the active attempt has authority', rows:8,
+          description:'A Run contains independent Tasks A and B. Each ready Task is bound to a Dispatch attempt and a worker. A validated worker_done commits Task and Dispatch settlement and a replay receipt atomically. Dependent Task C becomes ready only when both prerequisites complete. The coordinator processes and acknowledges its delivery, then explicitly reuses, retains, or releases the worker.',
+          nodes:[
+            {id:'run',x:.5,r:0,title:'Run',sub:'objective + inbox',what:'Run: a durable namespace tied to a coordinator identity and inbox. Binding generations fence replaced consumers; creating a Run does not launch a scheduler.',file:rpc+'runs/runs.ts'},
+            {id:'task-a',x:.25,r:1,title:'Task A',sub:'spec + owner',what:'Task: durable work with a self-contained specification, status, and dependencies. Tasks A and B are an illustrative independent wave, not a live execution.',file:db+'schema/create-graph-tables-sql.ts'},
+            {id:'task-b',x:.75,r:1,title:'Task B',sub:'spec + owner',what:'Parallel work: the coordinator starts ready independent Tasks. Orca records dependency facts; starting another agent is separate from scheduling the next wave.',file:db+'tasks/task-store.ts'},
+            {id:'attempt-a',x:.25,r:2,title:'Dispatch A',sub:'authoritative attempt',what:'Dispatch: one Task attempt bound to worker identity, process incarnation, capability hash, host scope, and nesting depth. Retries get new attempts; stale reports cannot settle them. A new Run does not reset the worker depth cap.',file:db+'schema/create-graph-tables-sql.ts'},
+            {id:'attempt-b',x:.75,r:2,title:'Dispatch B',sub:'authoritative attempt',what:'Claim: a ready Task and an available worker are checked when authority is assigned. Durable mutation receipts make acceptance inspectable instead of blindly duplicating a launch.',file:db+'worker-dispatch/worker-dispatch-start.ts'},
+            {id:'worker-a',x:.25,r:3,title:'Worker A',sub:'live preamble',what:'Preamble: contains Task ID, Dispatch ID, exact worker identity, and scoped commands for ask, heartbeat, checking mail, and worker_done. Knowing an ID alone does not grant authority.',file:runtime+'orchestration/preamble.ts'},
+            {id:'worker-b',x:.75,r:3,title:'Worker B',sub:'live preamble',what:'Start proof: accepted input and observed turn start are distinct. If supported observation finds no turn start, the worker remains start_unknown; Orca keeps its resources for inspection.',file:rpc+'worker/worker-start-readiness-settlement.ts'},
+            {id:'report',x:.5,r:4,title:'worker_done',sub:'succeeded / failed',what:'Report: workers explicitly send success or failure with both lifecycle IDs. The runtime validates the sender, capability, current process, and active attempt before accepting settlement.',file:rpc+'messaging/send-point-to-point.ts'},
+            {id:'commit',x:.5,r:5,title:'Atomic settlement',sub:'state + mail + receipt',what:'Commit: worker_done stores the message, reconciles Task/Dispatch outcome, and records replay evidence in one transaction. Only after commit does the runtime wake the coordinator.',file:rpc+'messaging/send-point-to-point.ts'},
+            {id:'dependent',x:.25,r:6,title:'Task C → ready',sub:'needs A + B',what:'Dependencies: C is promoted from pending to ready only when every prerequisite is completed. Failure is not completion. The coordinator still decides when to launch C.',file:db+'tasks/task-store.ts'},
+            {id:'delivery',x:.75,r:6,title:'Delivery batch',sub:'replay until ack',what:'Delivery: check returns the oldest outstanding batch; an unacknowledged batch is replayed. The coordinator answers questions and validates results before acknowledging its delivery ID.',file:rpc+'messaging/check-run.ts'},
+            {id:'next',x:.25,r:7,title:'Next wave',sub:'coordinator decision',what:'Next wave: readiness is a persisted fact, not automatic launch. The coordinator dispatches newly ready work through worker-start or the lower-level dispatch operation.',file:db+'dispatch-row-writer.ts'},
+            {id:'release',x:.75,r:7,title:'Reuse / retain / release',sub:'explicit next owner',what:'Cleanup: settlement and terminal ownership are separate. After an accepted report, the coordinator reuses the terminal, records retention, or releases it; user input can reclaim ownership.',file:rpc+'worker/worker-release.ts'}
+          ],
+          edges:[['run','task-a'],['run','task-b'],['task-a','attempt-a'],['task-b','attempt-b'],['attempt-a','worker-a'],['attempt-b','worker-b'],['worker-a','report'],['worker-b','report'],['report','commit'],['commit','dependent'],['commit','delivery'],['dependent','next'],['delivery','release']]
+        },
+        hosts: {
+          title:'The host that executes work owns its processes, files, and evidence', rows:6,
+          description:'Local execution places the UI, control runtime, coordination database, and agents on one machine. Direct SSH keeps coordination on the client and execution on a remote relay. A paired runtime has a host-local control plane. Losing contact means unverifiable, not exited.',
+          nodes:[
+            {id:'local',x:.25,r:0,title:'Local machine',sub:'one host',what:'Local: the client runtime, coordination database, and worker execution share a machine. A folder workspace is valid; Git worktree creation is only one placement option.',file:rpc+'worker/local-worker-start.ts'},
+            {id:'local-worker',x:.25,r:1,title:'Local agents',sub:'files + tools',what:'Local worker: the owning runtime launches and observes its agent. PTY and structured sessions use the same Task and Dispatch contract.',file:rpc+'worker/deliver-worker-dispatch-preamble.ts'},
+            {id:'ssh-client',x:.75,r:0,title:'SSH client',sub:'runtime + SQLite',what:'Direct SSH: Runs, Tasks, Dispatches, and mailboxes live in the controlling client. Remote orca commands proxy back to that runtime; the remote host owns execution.',file:'docs/reference/ssh-execution-boundary.md'},
+            {id:'ssh-worker',x:.75,r:1,title:'SSH execution host',sub:'relay + agents',what:'SSH host: repository, tools, credentials, processes, and transcripts remain remote. Losing the client connection can leave agents live while their Orca control channel is unavailable.',file:'docs/reference/ssh-execution-boundary.md'},
+            {id:'paired-ui',x:.25,r:3,title:'Client UI',sub:'remote view + control',what:'Paired runtime: the client views a peer that owns its own control plane. This is different from using a remote host as a direct-SSH execution target.',file:'docs/reference/ssh-execution-boundary.md'},
+            {id:'paired-host',x:.75,r:3,title:'Paired runtime host',sub:'runtime + SQLite',what:'Peer host: owns its own coordination runtime and worker execution. Its control plane can continue without the desktop client; survival still depends on host/service lifecycle.',file:'docs/reference/ssh-execution-boundary.md'},
+            {id:'paired-workers',x:.75,r:4,title:'Peer workers',sub:'host-local execution',what:'Remote authority: process, stop, transcript, and cleanup facts must come from the host executing the worker. The client must not silently substitute local execution.',file:'docs/reference/ssh-execution-boundary.md'},
+            {id:'contact',x:.5,r:5,title:'Lost contact',sub:'unverifiable ≠ exited',what:'Evidence rule: silence, a timeout, or a transport failure cannot prove process death. Positive host evidence is required to report exited or justify a duplicate retry.',file:'docs/reference/ssh-execution-boundary.md'}
+          ],
+          edges:[['local','local-worker'],['ssh-client','ssh-worker'],['paired-ui','paired-host'],['paired-host','paired-workers'],['ssh-worker','contact'],['paired-workers','contact']]
+        }
+      };
+      const namespace = 'http://www.w3.org/2000/svg';
+      let selected = 'coordinator';
+      const make = (tag, attributes = {}, text) => {
+        const element = document.createElementNS(namespace, tag);
+        Object.entries(attributes).forEach(([key,value]) => element.setAttribute(key,value));
+        if (text !== undefined) element.textContent = text;
+        return element;
+      };
+      const save = () => {
+        if (window.openai?.setWidgetState) window.openai.setWidgetState({modelContent:{view:viewSelect.value,component:selected},privateContent:null}).catch(() => {});
+      };
+      function draw() {
+        const view = views[viewSelect.value];
+        const width = Math.max(280,root.getBoundingClientRect().width);
+        const rowGap = 96, height = view.rows * rowGap;
+        const nodeWidth = Math.min(248,(width - 44) / 2);
+        svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
+        svg.setAttribute('height',height);
+        svg.replaceChildren(make('title',{id:'orca-diagram-title'},view.title),make('desc',{id:'orca-diagram-desc'},view.description));
+        const defs = make('defs');
+        const marker = make('marker',{id:'orca-arrow',viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:6,markerHeight:6,orient:'auto-start-reverse'});
+        marker.append(make('path',{d:'M 0 0 L 10 5 L 0 10 z',fill:'var(--muted-foreground)'}));
+        defs.append(marker); svg.append(defs);
+        const positions = Object.fromEntries(view.nodes.map(node=>[node.id,{x:node.x*width,y:node.r*rowGap+48}]));
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        const typography = getComputedStyle(root);
+        context.font = `${typography.fontSize} ${typography.fontFamily}`;
+        const wrap = text => {
+          const lines = []; let current = '';
+          for (const word of text.split(' ')) {
+            const next = current ? `${current} ${word}` : word;
+            if (current && context.measureText(next).width > nodeWidth-18) {lines.push(current);current=word;} else current=next;
+          }
+          if (current) lines.push(current);
+          return lines;
+        };
+        view.edges.forEach(([from,to])=>{
+          const a=positions[from],b=positions[to];
+          let start,end;
+          if(a.y===b.y){start=[a.x+nodeWidth/2,a.y];end=[b.x-nodeWidth/2-4,b.y];if(a.x>b.x){start=[a.x-nodeWidth/2,a.y];end=[b.x+nodeWidth/2+4,b.y];}}
+          else{const direction=Math.sign(b.y-a.y);start=[a.x,a.y+40*direction];end=[b.x,b.y-44*direction];}
+          const middle=(start[1]+end[1])/2;
+          let path = a.y===b.y ? `M${start} L${end}` : `M${start} C${start[0]},${middle} ${end[0]},${middle} ${end}`;
+          if(b.y<a.y)path=`M${a.x-nodeWidth/2},${a.y} H6 V${b.y} H${b.x-nodeWidth/2-4}`;
+          if(b.y-a.y>rowGap*2)path=`M${start} H${width-6} V${end[1]-12} H${end[0]} V${end[1]}`;
+          svg.append(make('path',{d:path,class:'orca-edge','marker-end':'url(#orca-arrow)'}));
+        });
+        view.nodes.forEach(node=>{
+          const point=positions[node.id];
+          const group=make('g',{'data-component':node.id,class:`cursor-interaction ${node.id===selected?'orca-selected':''}`,'data-tooltip':node.title});
+          group.append(make('rect',{x:point.x-nodeWidth/2,y:point.y-40,width:nodeWidth,height:80,rx:8,class:'orca-mark'}));
+          const lines=wrap(node.title).concat(wrap(node.sub));
+          lines.forEach((line,index)=>group.append(make('text',{x:point.x,y:point.y-(lines.length-1)*9+index*18,'text-anchor':'middle','dominant-baseline':'middle'},line)));
+          group.addEventListener('click',()=>{selected=node.id;componentSelect.value=selected;draw();save();});
+          svg.append(group);
+        });
+        const node=view.nodes.find(item=>item.id===selected);
+        detail.textContent=node.what;
+        source.textContent=node.file;
+      }
+      function chooseView(id) {
+        viewSelect.value=id;
+        const nodes=views[id].nodes;
+        if(!nodes.some(node=>node.id===selected)) selected=id==='system'?'coordinator':nodes[0].id;
+        componentSelect.replaceChildren(...nodes.map(node=>{const option=document.createElement('option');option.value=node.id;option.textContent=node.title;return option;}));
+        componentSelect.value=selected;
+        draw();
+      }
+      function restore(state) {
+        const choice=state?.modelContent;
+        if(!choice || !Object.hasOwn(views,choice.view))return;
+        if(views[choice.view].nodes.some(node=>node.id===choice.component))selected=choice.component;
+        chooseView(choice.view);
+      }
+      viewSelect.addEventListener('change',()=>{chooseView(viewSelect.value);save();});
+      componentSelect.addEventListener('change',()=>{selected=componentSelect.value;draw();save();});
+      window.addEventListener('openai:set_globals',event=>restore(event.detail?.globals?.widgetState));
+      chooseView('system');
+      restore(window.openai?.widgetState);
+      new ResizeObserver(()=>draw()).observe(root);
+    })();
+  </script>
+</div>

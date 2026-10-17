@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>From Hierarchy to Intelligence — visual brief</title>
+  <style>
+    @font-face{font-family:Geist;src:url(Geist-Variable.woff2);font-weight:100 900;font-display:swap}
+    :root{--background:#fff;--foreground:#0a0a0a;--card:#fff;--card-foreground:#0a0a0a;--primary:#171717;--primary-foreground:#fafafa;--muted:#f5f5f5;--muted-foreground:#737373;--border:#e5e5e5;--ring:#a1a1a1;--radius:0.625rem}
+    *{box-sizing:border-box}body{margin:0;background:var(--background);color:var(--foreground);font:14px/1.6 Geist,sans-serif;letter-spacing:.01em}
+    a{color:inherit;text-underline-offset:4px}button{font:inherit;cursor:pointer}button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--ring);outline-offset:4px}
+    header,main,footer{max-width:1280px;margin:auto;padding:32px}header{border-bottom:1px solid var(--border)}
+    .meta{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-foreground)}
+    h1{font-size:48px;line-height:1.05;font-weight:650;margin:16px 0}h2{font-size:24px;line-height:1.3;margin:0 0 16px}h3{font-size:18px;margin:0}p{margin:8px 0 16px}
+    .intro{max-width:760px;font-size:18px}.toolbar{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:24px}
+    .button{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:6px 16px;border:1px solid var(--border);border-radius:calc(var(--radius)*.8);background:var(--card);color:var(--card-foreground);text-decoration:none}
+    .button.primary{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary)}
+    main{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,1fr);gap:32px;align-items:start}
+    figure{margin:0}figure a{display:block}figure img{display:block;width:100%;height:auto;border:1px solid var(--border);border-radius:calc(var(--radius)*1.4)}figcaption{font-size:12px;color:var(--muted-foreground);margin-top:12px}
+    .panel{padding:24px;border:1px solid var(--border);border-radius:calc(var(--radius)*1.4);background:var(--card);color:var(--card-foreground);margin-bottom:24px}
+    .thesis{background:var(--primary);color:var(--primary-foreground)}.thesis p{font-size:20px;line-height:1.4;margin:0}
+    details{border-top:1px solid var(--border);padding:16px 0}details:last-child{padding-bottom:0}summary{cursor:pointer;font-weight:600;min-height:36px;align-content:center}details p{margin:12px 0 0}
+    .number{display:inline-block;width:24px;color:var(--muted-foreground);font-size:12px}.note{font-size:12px;color:var(--muted-foreground)}
+    .step{padding:16px;background:var(--muted);border-radius:var(--radius);margin:12px 0}.step p{margin-bottom:0}.roles{display:grid;gap:16px}.roles p{margin:0}
+    #example-text{min-height:110px}footer{border-top:1px solid var(--border);font-size:12px;color:var(--muted-foreground)}footer p{margin:0}
+    @media(max-width:800px){header,main,footer{padding:24px}h1{font-size:36px}main{grid-template-columns:1fr}.intro{font-size:16px}}
+    @media print{header,main,footer{padding:16px}.toolbar,.demo{display:none}main{display:block}aside{display:none}figure img{max-height:90vh;max-width:100%;width:auto;margin:auto}header h1{font-size:24px}header .intro{font-size:14px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="meta">Article → visual brief · Block · 31 March 2026</div>
+    <h1>From hierarchy<br>to intelligence.</h1>
+    <p class="intro">Block proposes a company where a shared AI system supplies context and coordinates work, while people build, own outcomes, and exercise judgment.</p>
+    <div class="toolbar">
+      <a class="button primary" href="infographic.png" download>Download infographic</a>
+      <button class="button" id="print">Print / save PDF</button>
+      <a class="button" href="https://block.xyz/inside/from-hierarchy-to-intelligence" target="_blank" rel="noopener">Read the article ↗</a>
+    </div>
+  </header>
+  <main>
+    <figure>
+      <a href="infographic.png" target="_blank" rel="noopener" aria-label="Open full-size infographic">
+        <img src="infographic.png" alt="Infographic summarizing Block's proposed shift from hierarchical information routing to a shared AI system, four system layers, three human roles, and a compounding transaction-data loop.">
+      </a>
+      <figcaption>Click the image for full size. A visual summary of the authors’ proposal; no measured performance claims.</figcaption>
+    </figure>
+    <aside aria-label="Explore the article's proposed model">
+      <section class="panel thesis">
+        <p>Coordination moves into the system.<br>Human judgment stays at the edge.</p>
+      </section>
+      <section class="panel">
+        <div class="meta">Explore · click a layer</div>
+        <h2>What the company builds</h2>
+        <details open>
+          <summary><span class="number">01</span> Capabilities</summary>
+          <p>Reusable financial building blocks: payments, lending, banking, and more. Each has reliability, compliance, and performance targets.</p>
+        </details>
+        <details>
+          <summary><span class="number">02</span> World model</summary>
+          <p>Two kinds of context: recorded company work and operations; customer and merchant transaction patterns. The model is intended to develop predictive and causal understanding.</p>
+        </details>
+        <details>
+          <summary><span class="number">03</span> Intelligence</summary>
+          <p>Use that context to combine capabilities into timely solutions. When a needed capability is missing, the gap informs the backlog.</p>
+        </details>
+        <details>
+          <summary><span class="number">04</span> Interfaces</summary>
+          <p>Hardware and software surfaces, including Square and Cash App, deliver the composed solutions.</p>
+        </details>
+      </section>
+      <section class="panel demo" aria-labelledby="example-title">
+        <div class="meta">Illustration from the article</div>
+        <h2 id="example-title">A restaurant’s seasonal dip</h2>
+        <div class="step" aria-live="polite">
+          <div class="meta" id="example-label">1 / 4 · Sense</div>
+          <p id="example-text">Transaction patterns suggest cash flow will tighten before a familiar seasonal slowdown.</p>
+        </div>
+        <button class="button" id="next">Next step →</button>
+        <p class="note">Hypothetical scenario in the article, not a reported deployment result.</p>
+      </section>
+      <section class="panel">
+        <h2>What people do</h2>
+        <div class="roles">
+          <div><h3>Individual contributors</h3><p>Build and operate the system’s layers.</p></div>
+          <div><h3>Directly Responsible Individuals</h3><p>Own cross-team problems and customer outcomes.</p></div>
+          <div><h3>Player-coaches</h3><p>Build while developing people and craft.</p></div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="meta">Status · early-stage transition</div>
+        <h2>A vision being tested</h2>
+        <p>The authors expect difficulty and failures. Humans retain responsibility for ethics, trust, novel situations, and high-stakes decisions.</p>
+        <p class="note">This infographic summarizes the article’s argument. It does not independently validate its historical account or proposed outcomes.</p>
+      </section>
+    </aside>
+  </main>
+  <footer>
+    <p>Source: <a href="https://block.xyz/inside/from-hierarchy-to-intelligence">“From Hierarchy to Intelligence”</a> · Jack Dorsey and Roelof Botha · Block · 31 March 2026. Paraphrased visual summary.</p>
+  </footer>
+  <script>
+    document.getElementById('print').addEventListener('click', () => window.print());
+    const steps = [
+      ['Sense', 'Transaction patterns suggest cash flow will tighten before a familiar seasonal slowdown.'],
+      ['Compose', 'The intelligence layer combines a short-term loan with a repayment schedule adjusted through payments.'],
+      ['Deliver', 'The proposed solution reaches the merchant through an interface before they start searching for financing.'],
+      ['Learn', 'Transactions enrich the model. If composition fails because a capability is missing, that gap informs future work.']
+    ];
+    let step = 0;
+    document.getElementById('next').addEventListener('click', () => {
+      step = (step + 1) % steps.length;
+      document.getElementById('example-label').textContent = `${step + 1} / 4 · ${steps[step][0]}`;
+      document.getElementById('example-text').textContent = steps[step][1];
+      document.getElementById('next').textContent = step === 3 ? 'Start again ↻' : 'Next step →';
+    });
+  </script>
+</body>
+</html>

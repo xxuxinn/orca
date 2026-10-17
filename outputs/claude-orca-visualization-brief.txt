@@ -1,0 +1,11 @@
+The user explicitly asked me to tell this Claude tab: "do the same visualization with its own skills if deemed a fit."
+
+Please create your own visualization explaining how Orca works, especially how multi-agent orchestration is architected and implemented. Work in this Testing-Orca checkout on the Mac Studio: /Users/xxuxinn/orca/workspaces/OrcaRepo/Testing-Orca.
+
+Read the applicable AGENTS.md. Inspect the actual code and documentation in this checkout so the explanation is source-backed. Choose your own design and use your own available Claude skills if you judge them suitable; you do not have to use Codex's visualize skill or copy the existing result.
+
+Explain the division between the human, coordinator agent, Orca CLI/RPC/runtime, durable coordination state, worker agents, and workspaces. Cover Task versus Dispatch attempt, dispatch authority, worker launch/readiness, messages and acknowledgment, questions/heartbeats/completion, dependencies and parallel work, and post-completion ownership/cleanup. Include the local versus SSH versus paired-runtime execution boundary where relevant. Distinguish implemented mechanisms from agent instructions, retired paths, and planned features. Support important claims with inspectable source references.
+
+Deliver a well-designed interactive HTML that can be opened in a browser on this Studio. The previous inline visualization showed "unavailable on this device", so do not rely on an in-chat visualization renderer for delivery. Verify the interactions and readable desktop/mobile layout. Open the finished result in Ego Lite using your ego-browser skill if available, and provide the output link/path in this Claude tab.
+
+Save your result under a distinct name, such as outputs/claude-orca-orchestration.html. Preserve the existing Codex output and do not modify application code, launch other agents, or publish anything. Existing Codex files are outputs/orca-orchestration-architecture.html and outputs/orca-orchestration-explained.html, available only as optional comparison material. The user wants your own version.
